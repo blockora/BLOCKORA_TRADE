@@ -398,6 +398,34 @@ class MarketDataEngine:
                         master = None
                     
                     if master:
+                        # Auto-detect available expiries from local scrip master
+                        available_exps = set()
+                        for it in master:
+                            if str(it.get("name")) == "NIFTY" and str(it.get("instrumenttype")) == "OPTIDX":
+                                available_exps.add(str(it.get("expiry", "")).upper())
+                        
+                        # Sort by date, pick latest FUTURE expiry (after today)
+                        from datetime import datetime as _dt
+                        today = _dt.now().date()
+                        future_exps = []
+                        for exp in available_exps:
+                            try:
+                                exp_date = _dt.strptime(exp, "%d%b%Y").date()
+                                if exp_date >= today:
+                                    future_exps.append((exp_date, exp))
+                            except:
+                                continue
+                        
+                        if future_exps:
+                            future_exps.sort()
+                            curr_exp = future_exps[0][1]  # Earliest future expiry
+                            self.logger.info(f"Auto-detected expiry from file: {curr_exp} (available: {[e[1] for e in future_exps[:3]]})")
+                        else:
+                            # Fallback to calendar calculation (existing logic)
+                            exp_day = self.config.get_int("analysis.expiry_weekday", 1)
+                            exp = datetime.now().date() + timedelta(days=((exp_day - datetime.now().weekday()) % 7))
+                            curr_exp = exp.strftime("%d%b%Y").upper()
+                        
                         tok = {}
                         for it in master:
                             exch = str(it.get("exch_seg") or it.get("exchange") or "")
@@ -428,8 +456,9 @@ class MarketDataEngine:
                         # Cache the extracted tokens with current expiry
                         self._tokens = tok
                         self._tokens_time = now
-                        self._tokens_loaded = True
                         self.logger.info(f"Tokens extracted from local master: {len(tok)}")
+                        # Diagnostic: log available expiries
+                        self.logger.info(f"Local file has these NIFTY expiries: {sorted(available_exps)[-5:]}")
                         return tok
                     else:
                         self.logger.warning("Local scrip master found but no NIFTY tokens for current expiry extracted")
