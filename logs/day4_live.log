@@ -1,0 +1,10 @@
+2026-08-28 01:18:47.524 | INFO     | core.logger_manager:_cleanup_old_log_folders:32 - Log rotation: deleted 1 old log folders
+2026-08-28 01:18:47 | INFO     | BLOCKORA_TRADE v1.0 starting...
+[I 260828 01:18:48 smartConnect:124] in pool
+2026-08-28 01:18:48 | INFO     | Angel One SmartAPI connected successfully
+2026-08-28 01:18:49 | INFO     | Option Chain Engine initialized (Multi-Source)
+2026-08-28 01:18:50 | INFO     | Telegram Bot connected
+2026-08-28 01:18:55 | INFO     | JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-08-28 01:18:55 | INFO     | Subscription Manager started (polling)
+2026-08-28 01:18:55 | INFO     | System initialization complete
+2026-08-28 01:18:55 | INFO     | BLOCKORA_TRADE started - entering main loop

@@ -1,0 +1,973 @@
+"""
+Enhanced Strike Selector for BLOCKORA_TRADE
+Replace: engines/ranking/strike_ranking_engine.py
+
+Bhai yeh file copy karke engines/ranking/ folder mein daal do
+"""
+
+import math
+from datetime import datetime, timedelta
+
+class StrikeRankingEngine:
+    """
+    Adaptive Strike Matrix - Dynamic strike selection
+    Replaces old 10-strike rigid system
+    """
+
+    def __init__(self, config, logger):
+        self.config = config
+        self.logger = logger
+        # Historical volumes for velocity calculation
+        self.historical_volumes = {}
+
+    def rank_strikes(self, analysis_results):
+        """
+        Main method - returns best CE and PE strikes
+        Call this from main.py instead of old rank_strikes()
+        """
+        self.logger.info("=== Adaptive Strike Ranking Started ===")
+
+        market_data = analysis_results.get("market_data", {})
+        option_chain = analysis_results.get("option_chain", {})
+        spot = market_data.get("ltp", 0)
+
+        if spot == 0:
+            self.logger.warning("Spot price 0, cannot rank strikes")
+            return {"best_ce": {}, "best_pe": {}, "ce_rankings": [], "pe_rankings": []}
+
+        # Get market parameters
+        atr = market_data.get("atr", 12.5)
+        vix = market_data.get("vix", 15)
+
+        # Time to expiry calculation
+        ctx = analysis_results.get("trade_context", {})
+        time_to_expiry = self._get_time_to_expiry(ctx)
+        is_expiry = ctx.get("is_expiry", False)
+        is_monthly = ctx.get("is_monthly_expiry", False)
+
+        self.logger.info(f"Spot: {spot} | ATR: {atr} | VIX: {vix} | Hours to expiry: {time_to_expiry:.1f}")
+
+        # Get dynamic strike range (replace old fixed 10 strikes)
+        strikes = self._get_adaptive_range(spot, atr, vix, time_to_expiry)
+        self.logger.info(f"Analyzing {len(strikes)} strikes: {strikes[:5]}...{strikes[-3:]}")
+
+        # Score all strikes
+        ce_scores = []
+        pe_scores = []
+
+        for strike in strikes:
+            strike_key = str(strike)
+
+            if strike_key in option_chain.get("ce_data", {}):
+                ce_result = self._score_strike(
+                    strike, spot, "CE", option_chain, market_data,
+                    analysis_results, time_to_expiry, is_expiry, is_monthly
+                )
+                ce_scores.append(ce_result)
+
+            if strike_key in option_chain.get("pe_data", {}):
+                pe_result = self._score_strike(
+                    strike, spot, "PE", option_chain, market_data,
+                    analysis_results, time_to_expiry, is_expiry, is_monthly
+                )
+                pe_scores.append(pe_result)
+
+        # Sort by total score
+        ce_scores.sort(key=lambda x: x["total_score"], reverse=True)
+        pe_scores.sort(key=lambda x: x["total_score"], reverse=True)
+
+        best_ce = ce_scores[0] if ce_scores else {}
+        best_pe = pe_scores[0] if pe_scores else {}
+
+        self.logger.info(f"Best CE: {best_ce.get('strike')} Score: {best_ce.get('total_score')}")
+        self.logger.info(f"Best PE: {best_pe.get('strike')} Score: {best_pe.get('total_score')}")
+
+        return {
+            "best_ce": best_ce,
+            "best_pe": best_pe,
+            "ce_rankings": ce_scores,
+            "pe_rankings": pe_scores
+        }
+
+    # ============================================================
+    # STEP 1: DYNAMIC STRIKE RANGE (Replace fixed 10 strikes)
+    # ============================================================
+    def _get_adaptive_range(self, spot, atr, vix, time_to_expiry_hours):
+        """
+        Pehle: Fixed ATM ke upar niche 5-5 strikes (total 10)
+        Ab: Market ke hisaab se range badalta hai
+
+        - VIX zyada hai = wider range chahiye
+        - Expiry paas hai = tighter range (theta risk)
+        - ATR zyada hai = wider range
+        """
+        # Base: ATR ke hisaab se (1 ATR = ~68% moves)
+        base_range = int(atr * 2.5)  # 2.5 ATR = ~99% moves captured
+
+        # VIX zyada hai toh range badao (volatility expansion)
+        if vix > 20:
+            base_range = int(base_range * 1.3)
+            self.logger.info(f"VIX high ({vix}), expanding range")
+        if vix > 25:
+            base_range = int(base_range * 1.6)
+
+        # Expiry ke paas range chhota karo (theta risk)
+        if time_to_expiry_hours < 2:
+            base_range = int(base_range * 0.4)  # Scalp mode
+            self.logger.info("Expiry day scalp mode - tight range")
+        elif time_to_expiry_hours < 6:
+            base_range = int(base_range * 0.6)
+        elif time_to_expiry_hours < 24:
+            base_range = int(base_range * 0.8)
+
+        # Round to nearest 50
+        half_range = max(50, (base_range // 50) * 50)
+        atm = round(spot / 50) * 50
+
+        strikes = list(range(atm - half_range, atm + half_range + 1, 50))
+        return strikes
+
+    # ============================================================
+    # STEP 2: 10-FACTOR SCORING (Enhanced from 7 factors)
+    # ============================================================
+    def _score_strike(self, strike, spot, opt_type, chain, market_data,
+                      analysis_results, time_to_expiry, is_expiry, is_monthly):
+        """
+        Har strike ko 10 factors se score karta hai
+        Total: 100 points
+        """
+
+        strike_key = str(strike)
+        my_data = chain.get("ce_data" if opt_type == "CE" else "pe_data", {}).get(strike_key, {})
+
+        scores = {}
+        reasons = []
+
+        # === FACTOR 1: Moneyness/Delta (15 pts) ===
+        # ATM strike = sabse zyada delta = sabse zyada movement
+        distance = abs(strike - spot)
+        if distance <= 25:
+            scores["moneyness"] = 15
+            reasons.append("ATM (Max Delta)")
+        elif distance <= 75:
+            scores["moneyness"] = 12
+            reasons.append("Near ATM")
+        elif distance <= 125:
+            scores["moneyness"] = 8
+        elif distance <= 200:
+            scores["moneyness"] = 5
+        else:
+            scores["moneyness"] = 2
+
+        # === FACTOR 2: Gamma Impact (10 pts) ===
+        # Expiry day par ATM gamma blast hota hai
+        scores["gamma"] = self._gamma_score(strike, spot, time_to_expiry, opt_type)
+        if scores["gamma"] >= 12:
+            reasons.append("Gamma Blast Zone")
+
+        # === FACTOR 3: Expected Move Fit (15 pts) ===
+        # Strike expected move ke beech mein hona chahiye
+        exp_move = analysis_results.get("trade_context", {}).get("expected_move", 30)
+        scores["move_fit"] = self._move_fit_score(strike, spot, exp_move, opt_type, my_data)
+        if scores["move_fit"] >= 10:
+            reasons.append("Sweet Move Zone")
+
+        # === FACTOR 4: OI Quality (12 pts) ===
+        # Fresh OI building + OI wall avoidance
+        pcr = chain.get("pcr", 1.0)
+        scores["oi"] = self._enhanced_oi_score(strike, opt_type, spot,
+            chain.get("ce_data", {}), chain.get("pe_data", {}), pcr)
+
+        # === FACTOR 5: Volume Velocity (10 pts) ===
+        # Current volume vs average = momentum confirmation
+        hist_key = (strike, opt_type)
+        hist_vols = self.historical_volumes.get(hist_key, [])
+        hist_avg = sum(hist_vols) / max(1, len(hist_vols))
+        scores["volume"] = self._volume_velocity_score(my_data, hist_avg)
+        if scores["volume"] >= 8:
+            reasons.append("Volume Spike")
+
+        # Update historical volume
+        if hist_key not in self.historical_volumes:
+            self.historical_volumes[hist_key] = []
+        self.historical_volumes[hist_key].append(my_data.get("volume", 0))
+        self.historical_volumes[hist_key] = self.historical_volumes[hist_key][-20:]
+
+        # === FACTOR 6: Spread Efficiency (8 pts) ===
+        # Tight spread = better execution price
+        scores["spread"] = self._spread_score(my_data)
+
+        # === FACTOR 7: Trend Confluence (12 pts) ===
+        # Multi-timeframe trend alignment
+        scores["trend"] = self._trend_confluence_score(strike, opt_type, analysis_results)
+
+        # === FACTOR 8: VWAP Distance (8 pts) ===
+        # Price vs VWAP = institutional bias
+        vwap = market_data.get("vwap", spot)
+        scores["vwap"] = self._vwap_score(spot, vwap, strike, opt_type, analysis_results)
+
+        # === FACTOR 9: Max Pain (5 pts) ===
+        # Near max pain = higher probability
+        max_pain = chain.get("max_pain", 0)
+        scores["max_pain"] = self._max_pain_score(strike, max_pain)
+
+        # === FACTOR 10: Historical Win Rate (5 pts) ===
+        # Self-learning from past trades
+        scores["historical"] = self._historical_score(strike, opt_type, analysis_results)
+
+        # === PENALTIES ===
+        total = sum(scores.values())
+
+        # Expiry day OTM penalty
+        if is_expiry:
+            otm = (opt_type == "CE" and strike > spot) or (opt_type == "PE" and strike < spot)
+            if otm:
+                penalty = 12 if is_monthly else 8
+                total -= penalty
+                reasons.append(f"Expiry OTM Penalty (-{penalty})")
+
+        # Far OTM theta risk near expiry
+        if time_to_expiry < 6 and distance > 100:
+            total -= 5
+            reasons.append("Far OTM Theta Risk")
+
+        return {
+            "strike": strike,
+            "option_type": opt_type,
+            "total_score": max(0, min(100, total)),
+            "scores": scores,
+            "reasons": reasons,
+            "ltp": my_data.get("ltp", 0),
+            "oi": my_data.get("oi", 0),
+            "change_oi": my_data.get("change_oi", 0),
+            "volume": my_data.get("volume", 0),
+            "iv": my_data.get("iv", 0)
+        }
+
+    # ============================================================
+    # INDIVIDUAL SCORING METHODS
+    # ============================================================
+
+    def _gamma_score(self, strike, spot, time_to_expiry, opt_type):
+        """
+        Expiry day par ATM gamma sabse zyada hota hai
+        Isliye expiry ke paas ATM strikes ko zyada score
+        """
+        if time_to_expiry > 48:
+            return 5  # Normal days, gamma not critical
+
+        distance = abs(strike - spot)
+
+        # Expiry day (< 6 hours)
+        if time_to_expiry < 6:
+            if distance <= 25:      # ATM
+                return 15           # King of gamma
+            elif distance <= 75:    # Near ATM
+                return 10
+            elif distance <= 125:
+                return 4
+            else:
+                return 0            # OTM = theta decay kills you
+
+        # 1-2 days to expiry
+        elif time_to_expiry < 48:
+            if distance <= 50:
+                return 12
+            elif distance <= 100:
+                return 7
+            else:
+                return 3
+
+        return 5
+
+    def _move_fit_score(self, strike, spot, exp_move, opt_type, my_data):
+        """
+        Strike expected move ke beech mein hona chahiye
+        Premium bhi check karo - expensive OTM = bad
+        """
+        premium = my_data.get("ltp", 0)
+
+        if opt_type == "CE":
+            if strike <= spot:
+                return 0  # ITM/ATM CE on bullish
+            dist = strike - spot
+            sweet_zone = exp_move / 2
+            coverage = max(0, 1 - abs(dist - sweet_zone) / max(exp_move, 1))
+            score = int(15 * coverage)
+            # Premium penalty
+            if premium > exp_move * 0.3:
+                score -= 3
+        else:
+            if strike >= spot:
+                return 0
+            dist = spot - strike
+            sweet_zone = exp_move / 2
+            coverage = max(0, 1 - abs(dist - sweet_zone) / max(exp_move, 1))
+            score = int(15 * coverage)
+            if premium > exp_move * 0.3:
+                score -= 3
+
+        return max(0, score)
+
+    def _enhanced_oi_score(self, strike, opt_type, spot, ce_data, pe_data, pcr):
+        """
+        Enhanced OI scoring:
+        1. Fresh OI building = institutional interest
+        2. OI concentration = yeh strike magnet hai
+        3. PCR context = extreme PCR = contrarian signal
+        4. OI wall avoidance = resistance/support ahead
+        """
+        my_data = ce_data.get(str(strike), {}) if opt_type == "CE" else pe_data.get(str(strike), {})
+        if not my_data:
+            return 0
+
+        oi = my_data.get("oi", 0)
+        ch_oi = my_data.get("change_oi", 0)
+        score = 0
+
+        # 1. Fresh OI building
+        if ch_oi > 0:
+            score += min(4, int(ch_oi / 2000))
+
+        # 2. OI concentration
+        neighbor_oi = []
+        for s in [strike-50, strike+50]:
+            n = ce_data.get(str(s), {}) if opt_type == "CE" else pe_data.get(str(s), {})
+            neighbor_oi.append(n.get("oi", 0))
+
+        if neighbor_oi and oi > max(neighbor_oi) * 1.5:
+            score += 3
+
+        # 3. PCR contrarian signal
+        if pcr > 1.5 and opt_type == "CE":
+            score += 2  # Extreme put writing = support strong
+        elif pcr < 0.5 and opt_type == "PE":
+            score += 2  # Extreme call writing = resistance strong
+
+        # 4. OI wall avoidance
+        opposite = pe_data if opt_type == "CE" else ce_data
+        wall_strike = None
+        wall_oi = 0
+        for k, v in opposite.items():
+            try:
+                oi_val = float(v.get("oi", 0))
+                if oi_val > wall_oi:
+                    wall_oi = oi_val
+                    wall_strike = int(k)
+            except:
+                pass
+
+        if wall_strike and abs(strike - wall_strike) <= 50:
+            score -= 3  # OI wall ahead
+
+        return max(0, score)
+
+    def _volume_velocity_score(self, my_data, hist_avg):
+        """
+        Current volume vs 20-period average
+        3x volume = institutional entry
+        """
+        current = my_data.get("volume", 0)
+        if hist_avg <= 0:
+            return 5
+        ratio = current / hist_avg
+        if ratio >= 3:
+            return 10
+        elif ratio >= 2:
+            return 8
+        elif ratio >= 1.5:
+            return 6
+        elif ratio >= 1:
+            return 4
+        return 2
+
+    def _spread_score(self, my_data):
+        """
+        Bid-ask spread = execution quality
+        Tight spread = better fill
+        """
+        bid = my_data.get("bid", 0)
+        ask = my_data.get("ask", 0)
+        ltp = my_data.get("ltp", 0)
+
+        if bid > 0 and ask > 0 and ltp > 0:
+            spread_pct = (ask - bid) / ltp * 100
+            if spread_pct <= 1:
+                return 8
+            elif spread_pct <= 3:
+                return 5
+            elif spread_pct <= 5:
+                return 2
+            return 0
+        return 3
+
+    def _trend_confluence_score(self, strike, opt_type, analysis_results):
+        """
+        Multi-timeframe trend alignment
+        Sab timeframes same direction = strong signal
+        """
+        trend = analysis_results.get("trend", {})
+        t_dir = trend.get("direction", "NEUTRAL")
+
+        ind = analysis_results.get("indicators", {})
+        rsi = ind.get("rsi", 50)
+        macd_hist = ind.get("macd_hist", 0)
+
+        mtf = analysis_results.get("multi_timeframe", {})
+        t5 = mtf.get("t5", "NEUTRAL")
+        t15 = mtf.get("t15", "NEUTRAL")
+        t1h = mtf.get("t1h", "NEUTRAL")
+
+        score = 0
+
+        # Direction match
+        if (opt_type == "CE" and t_dir == "BULLISH") or (opt_type == "PE" and t_dir == "BEARISH"):
+            score += 4
+
+        # MTF alignment
+        align_count = sum(1 for t in [t5, t15, t1h] if t == t_dir)
+        score += align_count * 2
+
+        # RSI confirmation
+        if opt_type == "CE" and 40 <= rsi <= 60:
+            score += 2
+        elif opt_type == "PE" and 40 <= rsi <= 60:
+            score += 2
+
+        # MACD confirmation
+        if opt_type == "CE" and macd_hist > 0:
+            score += 2
+        elif opt_type == "PE" and macd_hist < 0:
+            score += 2
+
+        return min(12, score)
+
+    def _vwap_score(self, spot, vwap, strike, opt_type, analysis_results):
+        """
+        Price vs VWAP = institutional bias
+        Above VWAP = bullish, Below = bearish
+        """
+        direction = analysis_results.get("trade_context", {}).get("direction", "NEUTRAL")
+
+        if direction == "BULLISH":
+            if spot > vwap:
+                return 8 if opt_type == "CE" else 3
+            else:
+                return 3 if opt_type == "CE" else 6
+        elif direction == "BEARISH":
+            if spot < vwap:
+                return 8 if opt_type == "PE" else 3
+            else:
+                return 3 if opt_type == "PE" else 6
+
+        return 5
+
+    def _max_pain_score(self, strike, max_pain):
+        """Near max pain = higher probability"""
+        if max_pain == 0:
+            return 3
+        dist = abs(strike - max_pain)
+        if dist <= 50:
+            return 5
+        elif dist <= 100:
+            return 3
+        return 1
+
+    def _historical_score(self, strike, opt_type, analysis_results):
+        """Self-learning from past trades"""
+        learning = analysis_results.get("learning", {})
+        strike_key = f"{strike}_{opt_type}"
+        win_rate = learning.get("strike_win_rates", {}).get(strike_key, 0.5)
+        return int(win_rate * 5)
+
+    def _get_time_to_expiry(self, ctx):
+        """Hours to expiry calculate karta hai"""
+        try:
+            expiry = ctx.get("expiry_date")
+            if expiry:
+                exp_dt = datetime.strptime(expiry, "%d%b%Y")
+                now = datetime.now()
+                if now.date() == exp_dt.date():
+                    market_close = datetime.combine(now.date(), datetime.strptime("15:30", "%H:%M").time())
+                    hours = (market_close - now).total_seconds() / 3600
+                    return max(0, hours)
+                else:
+                    days = (exp_dt - now).days
+                    return days * 24
+        except:
+            pass
+        return 168  # Default 1 week
+ IV ho to compute, warna honest 0 (no fake greeks).
+        comp_delta = 0
+        _rec = my_data if isinstance(my_data, dict) else {}
+        _iv = 0
+        try:
+            _iv = float(_rec.get("iv", 0) or 0)
+        except (TypeError, ValueError):
+            _iv = 0
+        if _iv > 0:
+            try:
+                _g = self._greeks(spot, strike, opt_type, _iv)
+                if _g:
+                    _delta = float(_g.get("delta", 0) or 0)
+                    comp_delta = int(6 * max(0.0, min(1.0, 1 - abs(_delta - 0.40) / 0.30)))
+                    if comp_delta >= 5:
+                        reasons.append(f"Delta Sweet Spot ({_delta:.2f})")
+            except Exception:
+                comp_delta = 0  # FAIL-SAFE: greeks kabhi crash nahi karega
+        components["delta"] = comp_delta
+
+        # ---- TOTAL: Sum of bounded components (natural 0-100) ----
+        score = sum(components.values())
+        # Structural penalties (spread / OI-wall / OI-gap)
+        total_penalty = spread_penalty + oi_wall_penalty + oi_gap_penalty
+        if total_penalty:
+            score -= total_penalty
+        # Expiry penalty (negative adjustment) - unchanged
+        if analysis_results.get("trade_context", {}).get("is_expiry"):
+            otm = (opt_type == "CE" and offset > 0) or (opt_type == "PE" and offset < 0)
+            if otm:
+                penalty = 10 if analysis_results.get("trade_context", {}).get("is_monthly_expiry") else 7
+                score -= penalty
+                reasons.append(f"Expiry: OTM theta risk (-{penalty})")
+
+        engine_score = max(0, min(100, score))
+
+        # ---- BRAIN 7-FACTOR CONFIDENCE ----
+        # Extract live data for brain scoring
+        ctx = analysis_results.get("trade_context", {})
+        market_data = analysis_results.get("market_data", {})
+        indicators = analysis_results.get("indicators", {})
+
+        my_data = ce_d if opt_type == "CE" else pe_d
+        _iv = float(my_data.get("iv", 0) or 0)
+        _delta = 0
+        if _iv > 0:
+            try:
+                _g = self._greeks(spot, strike, opt_type, _iv)
+                if _g:
+                    _delta = float(_g.get("delta", 0) or 0)
+            except Exception:
+                _delta = 0
+
+        # OI change % for brain
+        oi_chg = float(my_data.get("change_oi", 0) or 0)
+        prev_oi = float(my_data.get("prev_oi", 1) or 1)
+        oi_change_pct = (oi_chg / prev_oi * 100) if prev_oi > 0 else 0
+
+        # Liquidity
+        vol = float(my_data.get("volume", 0) or 0)
+        bid = float(my_data.get("bid", 0) or 0)
+        ask = float(my_data.get("ask", 0) or 0)
+        ltp = float(my_data.get("ltp", 0) or 0)
+        b_src = my_data.get("bid_source", "UNKNOWN")
+        a_src = my_data.get("ask_source", "UNKNOWN")
+        if b_src == "UNKNOWN" or a_src == "UNKNOWN":
+            spread_pct = 5.0  # neutral when source unknown
+        else:
+            spread_pct = ((ask - bid) / ltp * 100) if ltp > 0 and bid > 0 and ask > 0 else 5.0
+
+        # Technical
+        rsi = float(indicators.get("rsi", 50) or 50)
+        adx = float(indicators.get("adx", 15) or 15)
+        price = spot
+        vwap = float(market_data.get("vwap", spot) or spot)
+        macd_hist = float(indicators.get("macd_hist", 0) or 0)
+        direction = ctx.get("direction", "NEUTRAL")
+
+        # RR ratio from entry/SL/targets - use same ATR-based formula as brain
+        entry_est = ltp if ltp > 0 else 100
+        atr = market_data.get("atr", 12.5)
+        sl_est = entry_est - 1.5 * atr
+        t2_est = entry_est + 2.0 * atr
+        rr_ratio = abs(t2_est - entry_est) / abs(entry_est - sl_est) if entry_est != sl_est else 1.0
+
+        # Candle pattern (default)
+        pattern = "No Pattern"
+        at_key_level = False
+
+        brain_scores = {
+            'delta': delta_score(_delta if _delta else -0.5),
+            'iv': iv_score(ctx.get("iv_rank", 50)),
+            'oi': oi_score(oi_change_pct, direction, opt_type),
+            'liquidity': liquidity_score(vol, spread_pct),
+            'technical': technical_score(rsi, adx, price, vwap, macd_hist, direction),
+            'rr': rr_score(rr_ratio),
+            'candle': candle_score(pattern, at_key_level),
+            'iv_rank': ctx.get("iv_rank", 50),
+            'counter_trend': False,
+            'low_volume': vol < 1000,
+            'news_event': False
+        }
+        brain_conf, brain_weighted, brain_penalties = calculate_confidence(brain_scores)
+
+        # ---- FINAL SCORE = Average of Engine + Brain ----
+        final_score = round((engine_score + brain_conf) / 2, 1)
+        reasons.append(f"Engine:{engine_score} Brain:{brain_conf:.1f} Final:{final_score}")
+
+        # Clamp to 0-100 (safety)
+        return max(0, min(100, final_score)), reasons
+
+    def _find_oi_wall(self, chain):
+        """Return strike (int) with max OI among records where oi_source==REAL, else None."""
+        best_strike = None
+        best_oi = 0
+        for k, rec in (chain or {}).items():
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("oi_source", "UNKNOWN") != "REAL":
+                continue
+            try:
+                oi = float(rec.get("oi", 0) or 0)
+            except (TypeError, ValueError):
+                oi = 0
+            if oi > best_oi:
+                best_oi = oi
+                try:
+                    best_strike = int(k)
+                except (TypeError, ValueError):
+                    best_strike = k
+        return best_strike
+
+    def _component_weights(self):
+        """Documented max weights per component — rigid table, sum == EXACTLY 100."""
+        return {
+            "distance": 10,
+            "move_fit": 8,
+            "delta": 6,
+            "trend": 13,  # base + ensemble bonus (0-5) possible; documented max 13
+            "indicators": 8,
+            "structure": 4,
+            "oi": 9,  # base + oi_flow_bonus (0-3) possible
+            "liquidity": 3,
+            "quality": 2,
+            "candle_momentum": 4,  # new: recent 5m candle direction match
+            "spread": self.config.get_int("strikes.spread_weight", 9),
+            "oi_wall": self.config.get_int("strikes.oi_wall_weight", 8),
+            "max_pain": self.config.get_int("strikes.max_pain_weight", 6),
+            "continuity": self.config.get_int("strikes.continuity_weight", 5),
+            "oi_gap": self.config.get_int("strikes.oi_gap_weight", 5),
+        }
+
+    def _greeks(self, spot, strike, opt_type, iv):
+        """Black-Scholes greeks helper (greeks.py) — iv <= 0 → None (honest)."""
+        try:
+            from engines.ranking.greeks import black_scholes, days_to_expiry
+            return black_scholes(spot, strike, days_to_expiry(self.config), iv, opt_type)
+        except Exception:
+            return None
+
+    def _estimate_premium(self, strike, spot, option_type):
+        """Intrinsic + expiry-aware time value (BS approximation)"""
+        import math
+        from datetime import datetime
+        intrinsic = max(0, spot - strike) if option_type == "CE" else max(0, strike - spot)
+
+        # Agla expiry day (config: Tuesday=1)
+        exp_day = self.config.get_int("analysis.expiry_weekday", 1)
+        days = (exp_day - datetime.now().weekday()) % 7
+
+        # ATM time value = 0.4 * S * sigma * sqrt(T)
+        tv = 0.4 * spot * 0.12 * math.sqrt(max(days, 0.5) / 365)
+        if days == 0:
+            tv *= 0.5  # expiry day: time value aadhi
+
+        # OTM/ITM scaling (ATM par max time value)
+        dist = abs(strike - spot)
+        scale = max(0.35, 1.0 - (dist / 300))
+        return round(intrinsic + (tv * scale), 1)
+
+    def _quality_bonus(self, strike, opt_type, spot, analysis_results):
+        """💎 Real chain data (OI/Volume) se strike quality bonus (0-25)"""
+        chain = analysis_results.get("option_chain", {}) or {}
+        side = chain.get("ce_data") if opt_type == "CE" else chain.get("pe_data")
+        d = (side or {}).get(strike) or {}
+        if not isinstance(d, dict):
+            return 0, []
+        if not d:
+            return 0, []
+        try:
+            oi = float(d.get("oi", 0) or 0)
+            vol = float(d.get("volume", 0) or 0)
+            ch_oi = float(d.get("change_oi", 0) or 0)
+        except Exception:
+            return 0, []
+
+        bonus = 0
+        reasons = []
+
+        # OI strength (0-10) - jitna OI, utni liquidity + level importance
+        if oi >= 50000:
+            bonus += 10; reasons.append("High OI")
+        elif oi >= 20000:
+            bonus += 6
+        elif oi >= 5000:
+            bonus += 3
+
+        # Volume strength (0-10) - active trading
+        if vol >= 100000:
+            bonus += 10; reasons.append("High Volume")
+        elif vol >= 20000:
+            bonus += 6
+        elif vol >= 5000:
+            bonus += 3
+
+        # OI building (0-5) - writers active = level strong
+        if ch_oi > 0:
+            bonus += 5; reasons.append("OI Building")
+
+        return bonus, reasons
+
+    def _calculate_option_move_fit(self, strike, spot, expected_move, opt_type, analysis_results, option_chain):
+        """CALCULATE OPTION_MOVE_FIT: bounded 0..10 enhancement based on expected move alignment.
+
+        Depends on: distance + expected_move + premium (Greeks UNAVAILABLE - marked DERIVED/ESTIMATED)
+        For BULLISH + CE: evaluates upside expected-move response
+        For BEARISH + PE: evaluates downside expected-move response
+        Returns (fit_score 0-10, list of reason strings)
+        """
+        ctx = analysis_results.get("trade_context", {})
+        direction = ctx.get("direction", "NEUTRAL").upper()
+        exp_move = expected_move if expected_move else ctx.get("expected_move", 30)
+
+        reasons = []
+        fit_score = 0
+
+        if direction not in ("BULLISH", "BEARISH") or exp_move <= 0:
+            return 0, ["No directional expectation"]
+
+        # Premium data from option chain
+        chain_side = option_chain.get("ce_data") if opt_type == "CE" else option_chain.get("pe_data", {})
+        chain_rec = chain_side.get(strike) or {}
+        if not isinstance(chain_rec, dict):
+            chain_rec = {}
+        premium = chain_rec.get("ltp", 0) or 0
+        try:
+            premium = float(premium)
+        except (TypeError, ValueError):
+            premium = 0
+
+        if direction == "BULLISH" and opt_type == "CE":
+            # Upside expected move: strike at spot + exp/2 = sweet zone (premium affordable)
+            dist_from_spot = strike - spot  # positive = above spot
+            if strike > spot:
+                # Continuous coverage: peak at spot + exp/2, linear fall toward edges
+                coverage = max(0.0, 1 - abs(dist_from_spot - exp_move / 2) / max(exp_move, 1))
+                fit_score = int(10 * coverage)
+                premium_penalty = min(5, int(5 * premium / max(exp_move, 1))) if premium > 0 else 0
+                fit_score = max(0, fit_score - premium_penalty)
+                reasons.append(f"BULLISH move fit: strike {dist_from_spot}pt above spot (sweet ~{int(exp_move/2)}pt), premium adjusted")
+            else:
+                # strike below spot = wrong direction for bullish
+                fit_score = 0
+                reasons.append(f"BULLISH: strike {strike} below spot {spot} - wrong direction")
+
+        elif direction == "BEARISH" and opt_type == "PE":
+            # Downside expected move: strike at spot - exp/2 = sweet zone
+            dist_from_spot = spot - strike  # positive = below spot
+            if strike < spot:
+                coverage = max(0.0, 1 - abs(dist_from_spot - exp_move / 2) / max(exp_move, 1))
+                fit_score = int(10 * coverage)
+                premium_penalty = min(5, int(5 * premium / max(exp_move, 1))) if premium > 0 else 0
+                fit_score = max(0, fit_score - premium_penalty)
+                reasons.append(f"BEARISH move fit: strike {dist_from_spot}pt below spot (sweet ~{int(exp_move/2)}pt), premium adjusted")
+            else:
+                # strike above spot = wrong direction for bearish
+                fit_score = 0
+                reasons.append(f"BEARISH: strike {strike} above spot {spot} - wrong direction")
+
+        else:
+            # Wrong combination (e.g., BULLISH + PE, or BEARISH + CE)
+            fit_score = 0
+            reasons.append(f"Direction mismatch: {direction} + {opt_type}")
+
+        # Bounded 0-10 safety clamp
+        fit_score = max(0, min(10, fit_score))
+
+        # If no reasons generated, add default
+        if not reasons:
+            reasons.append("Move fit calculated from available data")
+
+        return fit_score, reasons
+
+    def _calculate_levels(self, strike_data, option_type, spot_price, option_chain):
+        strike = strike_data.get("strike", 0)
+
+        # 🔥 REAL LIVE PREMIUM from chain
+        if option_type == "CE":
+            chain_rec = option_chain.get("ce_data", {}).get(strike) or {}
+        else:
+            chain_rec = option_chain.get("pe_data", {}).get(strike) or {}
+        if not isinstance(chain_rec, dict):
+            chain_rec = {}
+        real_ltp = chain_rec.get("ltp", 0)
+
+        # 🔴 BUG FIX: volume/OI/IV/bid/ask sources chain se _best tak carry karo
+        strike_data["volume_source"] = chain_rec.get("volume_source", "UNKNOWN")
+        strike_data["oi_source"] = chain_rec.get("oi_source", "UNKNOWN")
+        strike_data["iv_source"] = chain_rec.get("iv_source", "UNKNOWN")
+        strike_data["bid_source"] = chain_rec.get("bid_source", "UNKNOWN")
+        strike_data["ask_source"] = chain_rec.get("ask_source", "UNKNOWN")
+        # 🔴 FIX A: option_type carry karo so CI/continuity winner ka type padh sakein
+        strike_data["option_type"] = option_type
+
+        # Expiry: chain_rec se, warna config-based derived (real date, fake nahi)
+        expiry = chain_rec.get("expiry", "")
+        if not expiry or str(expiry).strip().upper() in ("", "UNAVAILABLE", "NONE"):
+            try:
+                from datetime import datetime as _dt, timedelta as _td
+                exp_day = self.config.get_int("analysis.expiry_weekday", 1)
+                expiry = (_dt.now().date() + _td(days=((exp_day - _dt.now().weekday()) % 7))
+                          ).strftime("%d%b%Y").upper()
+            except Exception:
+                expiry = "UNAVAILABLE"
+        strike_data["expiry"] = expiry
+
+        # 🔥 FIX 1: RAW live values carry karo so Contract Intelligence real data padhe
+        _num = lambda v, default=0: (float(v) if v is not None else default)
+        strike_data["oi"] = _num(chain_rec.get("oi"))
+        strike_data["change_oi"] = _num(chain_rec.get("change_oi"))
+        strike_data["prev_oi"] = chain_rec.get("prev_oi", None)
+        strike_data["oi_timestamp"] = chain_rec.get("oi_timestamp", "") or ""
+        strike_data["prev_oi_timestamp"] = chain_rec.get("prev_oi_timestamp", "") or ""
+        strike_data["volume"] = _num(chain_rec.get("volume"))
+        strike_data["prev_volume"] = chain_rec.get("prev_volume", None)
+        strike_data["volume_timestamp"] = chain_rec.get("volume_timestamp", "") or ""
+        strike_data["prev_volume_timestamp"] = chain_rec.get("prev_volume_timestamp", "") or ""
+        strike_data["bid"] = chain_rec.get("bid", None)
+        strike_data["ask"] = chain_rec.get("ask", None)
+        strike_data["bid_timestamp"] = chain_rec.get("bid_timestamp", "") or ""
+        strike_data["ask_timestamp"] = chain_rec.get("ask_timestamp", "") or ""
+        strike_data["iv"] = chain_rec.get("iv", None)
+        strike_data["prev_iv"] = chain_rec.get("prev_iv", None)
+        strike_data["iv_timestamp"] = chain_rec.get("iv_timestamp", "") or ""
+        strike_data["prev_iv_timestamp"] = chain_rec.get("prev_iv_timestamp", "") or ""
+        strike_data["ltp"] = _num(chain_rec.get("ltp"))
+        strike_data["last_price"] = chain_rec.get("last_price", chain_rec.get("ltp", None))
+        strike_data["prev_ltp"] = chain_rec.get("prev_ltp", None)
+        strike_data["ltp_timestamp"] = chain_rec.get("ltp_timestamp", "") or ""
+        strike_data["prev_ltp_timestamp"] = chain_rec.get("prev_ltp_timestamp", "") or ""
+        strike_data["underlying_change"] = _num(chain_rec.get("underlying_change"))
+        strike_data["premium_change"] = _num(chain_rec.get("premium_change"))
+
+        # Scoring fields CI/continuity read from best_strike_data
+        strike_data["baseline_score"] = _num(strike_data.get("score"))
+        strike_data["enhanced_score"] = _num(strike_data.get("enhanced_score", strike_data.get("score")))
+        strike_data["score_margin"] = _num(strike_data.get("score_margin"))
+        strike_data["move_fit"] = _num(strike_data.get("move_fit"))
+
+        # 🎯 FIX #4.2: Premium source metadata (numeric LTP alone = REAL nahi!)
+        from datetime import datetime as _dt
+        chain_ts = option_chain.get("timestamp", "") or ""
+        age = None
+        if chain_ts:
+            try:
+                age = max(0.0, (_dt.now() - _dt.fromisoformat(chain_ts)).total_seconds())
+            except Exception:
+                age = None
+
+        # REAL = numeric LTP > 1 + timestamp verified + age <= MAX_LTP_AGE (config)
+        max_age = self.config.get_int("analysis.max_ltp_age_seconds", 15)
+        is_real = bool(real_ltp and float(real_ltp) > 1 and age is not None and age <= max_age)
+        if is_real:
+            entry = float(real_ltp)
+            source = "REAL"
+        else:
+            entry = self._estimate_premium(strike, spot_price, option_type)
+            source = "ESTIMATED"
+            age = None
+
+        # Keep only entry + premium metadata (SL/Targets calculated in main.py via brain)
+        strike_data.update({
+            "entry": round(entry, 2),
+            "premium_source": source,
+            "premium_is_real": is_real,
+            "premium_timestamp": chain_ts if is_real else None,
+            "premium_age_seconds": round(age, 1) if is_real else None,
+        })
+        return strike_data
+
+    def is_real_ltp_valid(self, option_data):
+        """🎯 FIX #4.3: Centralized REAL LTP validation gate"""
+        try:
+            # 1 & 2: Premium exists + numeric
+            premium = option_data.get("entry", option_data.get("premium", option_data.get("ltp")))
+            if premium is None:
+                return False
+            try:
+                premium = float(premium)
+            except (TypeError, ValueError):
+                return False
+
+            # 3: Premium > 0
+            if premium <= 0:
+                return False
+
+            # 4: Source REAL hai
+            if option_data.get("premium_source", "") != "REAL":
+                return False
+            if not option_data.get("premium_is_real", False):
+                return False
+
+            # 6: Timestamp available/valid
+            if not option_data.get("premium_timestamp"):
+                return False
+
+            # 5: Stale nahi hai (config-driven MAX_LTP_AGE)
+            age = option_data.get("premium_age_seconds")
+            if age is None:
+                return False
+            max_age = self.config.get_int("analysis.max_ltp_age_seconds", 15)
+            if float(age) > max_age:
+                return False
+
+            # 7: Token current (Fix #5 expiry-bound cache guarantee karta hai;
+            #    agar explicit flag ho to respect karo)
+            if option_data.get("token_current") is False:
+                return False
+
+            return True
+        except Exception:
+            return False
+
+    def classify_price_source(self, option_data):
+        """🎯 FIX #9: Price source classification (REAL/ESTIMATED/STALE/INVALID/MISSING)
+        FIX #10 FAIL-SAFE: kisi bhi uncertainty me REAL kabhi nahi return hoga"""
+        try:
+            # FIX: Zero ko MISSING mat samjho (0 is valid but INVALID price)
+            if "entry" in option_data:
+                premium = option_data["entry"]
+            elif "premium" in option_data:
+                premium = option_data["premium"]
+            elif "ltp" in option_data:
+                premium = option_data["ltp"]
+            else:
+                premium = None
+            # MISSING: premium hai hi nahi
+            if premium is None:
+                return "MISSING"
+            # INVALID: numeric nahi hai
+            try:
+                premium = float(premium)
+            except (TypeError, ValueError):
+                return "INVALID"
+            # INVALID: zero ya negative
+            if premium <= 0:
+                return "INVALID"
+            # ESTIMATED: source REAL confirmed nahi
+            if option_data.get("premium_source", "") != "REAL" or not option_data.get("premium_is_real", False):
+                return "ESTIMATED"
+            # INVALID: timestamp proof nahi
+            if not option_data.get("premium_timestamp"):
+                return "INVALID"
+            age = option_data.get("premium_age_seconds")
+            if age is None:
+                return "INVALID"
+            # STALE: real tha lekin ab purana hai
+            max_age = self.config.get_int("analysis.max_ltp_age_seconds", 15)
+            if float(age) > max_age:
+                return "STALE"
+            # Sirf 100% confirmed fresh broker data = REAL
+            return "REAL"
+        except Exception:
+            return "INVALID"  # FAIL-SAFE: exception = never REAL

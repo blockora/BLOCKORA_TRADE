@@ -1,0 +1,136 @@
+{
+  "application": {
+    "name": "BLOCKORA_TRADE",
+    "version": "1.0",
+    "mode": "production",
+    "timezone": "Asia/Kolkata",
+    "market": "NSE",
+    "exchange": "NFO",
+    "symbol": "NIFTY"
+  },
+  "data_sources": {
+    "primary": "jugaad_data",
+    "fallback": "nse_direct",
+    "nse_direct_enabled": true
+  },
+  "greeks": {
+    "enabled": true,
+    "risk_free_rate": 0.06,
+    "model": "black_scholes"
+  },
+  "market_hours": {
+    "open": "09:15",
+    "close": "15:30",
+    "pre_open": "09:00",
+    "post_close": "15:45"
+  },
+  "analysis": {
+    "cycle_interval_seconds": 60,
+    "min_confidence_threshold": 78,
+    "buy_confidence_margin": 2,
+    "expiry_weekday": 1,
+    "min_risk_reward": 2.0,
+    "max_recommendations_per_cycle": 2,
+    "max_ltp_age_seconds": 15,
+    "option_chain_analysis_range": 750,
+    "timeframes": [
+      "5s",
+      "15s",
+      "30s",
+      "1m",
+      "3m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "4h",
+      "D",
+      "W"
+    ]
+  },
+  "confidence": {
+    "reject_below": 70,
+    "weak": 79,
+    "good": 89,
+    "excellent": 94,
+    "institutional": 95
+  },
+  "risk": {
+    "max_risk_per_trade_percent": 2,
+    "max_daily_loss_percent": 5,
+    "max_weekly_loss_percent": 10,
+    "min_risk_reward_ratio": 2.0,
+    "preferred_risk_reward_ratio": 3.0
+  },
+  "strikes": {
+    "nearby_count": 5,
+    "max_strikes_analyze": 15,
+    "min_volume": 100,
+    "max_spread": 5.0,
+    "enable_spread_factor": true,
+    "enable_oi_wall_factor": true,
+    "enable_max_pain_factor": true,
+    "enable_continuity_factor": true,
+    "enable_oi_gap_factor": true,
+    "enable_continuous_spread": true,
+    "spread_weight": 9,
+    "oi_wall_weight": 8,
+    "max_pain_weight": 6,
+    "continuity_weight": 5,
+    "oi_gap_weight": 5
+  },
+  "indicators": {
+    "ema_periods": [
+      9,
+      20,
+      50,
+      200
+    ],
+    "rsi_period": 14,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9,
+    "adx_period": 14,
+    "atr_period": 14,
+    "bollinger_period": 20,
+    "bollinger_std": 2,
+    "supertrend_period": 10,
+    "supertrend_multiplier": 3
+  },
+  "weights": {
+    "market_structure": 20,
+    "smc": 12,
+    "ict": 10,
+    "wyckoff": 8,
+    "candlestick": 8,
+    "chart_pattern": 6,
+    "indicators": 15,
+    "volume": 3,
+    "open_interest": 8,
+    "option_chain": 10,
+    "premium": 4,
+    "greeks": 3,
+    "multi_timeframe": 3,
+    "risk_management": 10
+  },
+  "telegram": {
+    "enabled": true,
+    "send_no_trade": true,
+    "send_session_summary": true,
+    "send_errors": true,
+    "max_reasons": 10
+  },
+  "database": {
+    "path": "./database/blockora_trade.db",
+    "backup_enabled": true,
+    "backup_interval_hours": 24,
+    "retention_days": 90
+  },
+  "logging": {
+    "level": "INFO",
+    "directory": "./logs",
+    "max_file_size_mb": 10,
+    "backup_count": 5,
+    "console_output": true
+  }
+}

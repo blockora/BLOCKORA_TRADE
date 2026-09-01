@@ -1,0 +1,112 @@
+2026-08-26 09:53:54.276 | INFO     | core.logger_manager:_cleanup_old_log_folders:32 - Log rotation: deleted 1 old log folders
+2026-08-26 09:53:54 | INFO     | BLOCKORA_TRADE v1.0 starting...
+[I 260826 09:53:54 smartConnect:124] in pool
+2026-08-26 09:53:55 | INFO     | Angel One SmartAPI connected successfully
+2026-08-26 09:53:55 | INFO     | Option Chain Engine initialized (Multi-Source)
+2026-08-26 09:53:57 | INFO     | Telegram Bot connected
+2026-08-26 09:53:59 | INFO     | JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-08-26 09:53:59 | INFO     | Subscription Manager started (polling)
+2026-08-26 09:53:59 | INFO     | System initialization complete
+2026-08-26 09:53:59 | INFO     | BLOCKORA_TRADE started - entering main loop
+2026-08-26 09:53:59 | INFO     | Market OPENED - Starting analysis
+2026-08-26 09:54:44 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 09:54:44 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 09:54:44 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 09:54:44 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 09:54:49 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 09:54:53 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:22:08 | INFO     | BLOCKORA_TRADE v1.0 starting...
+[I 260826 11:22:09 smartConnect:124] in pool
+2026-08-26 11:22:09 | INFO     | Angel One SmartAPI connected successfully
+2026-08-26 11:22:10 | INFO     | Option Chain Engine initialized (Multi-Source)
+2026-08-26 11:22:11 | INFO     | Telegram Bot connected
+2026-08-26 11:22:14 | INFO     | JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-08-26 11:22:14 | INFO     | Subscription Manager started (polling)
+2026-08-26 11:22:15 | INFO     | System initialization complete
+2026-08-26 11:22:15 | INFO     | BLOCKORA_TRADE started - entering main loop
+2026-08-26 11:22:15 | INFO     | Market OPENED - Starting analysis
+2026-08-26 11:23:01 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:23:01 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:23:01 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:23:01 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:23:06 | WARNING  | Stale data: ['No candles', 'Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:23:15 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:25:03 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:25:03 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:25:03 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:25:04 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:25:04 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:25:08 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:25:17 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:27:06 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:27:06 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:27:06 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:27:06 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:27:06 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:27:11 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:27:15 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:29:11 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:29:11 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:29:11 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:29:12 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:29:12 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:29:16 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:29:20 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:39:52 | INFO     | BLOCKORA_TRADE v1.0 starting...
+[I 260826 11:39:52 smartConnect:124] in pool
+2026-08-26 11:39:53 | INFO     | Angel One SmartAPI connected successfully
+2026-08-26 11:39:54 | INFO     | Option Chain Engine initialized (Multi-Source)
+2026-08-26 11:39:55 | INFO     | Telegram Bot connected
+2026-08-26 11:39:58 | INFO     | JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-08-26 11:39:58 | INFO     | Subscription Manager started (polling)
+2026-08-26 11:39:58 | INFO     | System initialization complete
+2026-08-26 11:39:58 | INFO     | BLOCKORA_TRADE started - entering main loop
+2026-08-26 11:39:58 | INFO     | Market OPENED - Starting analysis
+2026-08-26 11:40:53 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:40:53 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:40:54 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:40:54 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:40:58 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:41:04 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:42:52 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:42:52 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:42:52 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:42:53 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:42:53 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:42:58 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:43:02 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:44:49 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:44:49 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:44:49 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:44:50 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:44:50 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:44:55 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:44:59 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:46:53 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:46:53 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:46:53 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:46:54 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:46:54 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:46:58 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:47:06 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:49:03 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:49:03 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:49:03 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:49:04 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:49:04 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:49:10 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:49:14 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:51:54 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:51:54 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:51:54 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:51:57 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:51:57 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:52:03 | WARNING  | Stale data: ['Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:52:31 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']
+2026-08-26 11:58:08 | INFO     | NSE source cooldown: CORSPROXY (60s)
+2026-08-26 11:58:08 | INFO     | Expiry changed: 25AUG2026 → 01SEP2026, refreshing tokens
+2026-08-26 11:58:08 | INFO     | Instrument master download (~30MB, startup only)...
+2026-08-26 11:58:34 | WARNING  | Download failed; using OLD cache (expiry: 25AUG2026)
+2026-08-26 11:58:34 | WARNING  | Token load failed (fallback active): 'NoneType' object is not iterable
+2026-08-26 11:58:39 | WARNING  | Stale data: ['Spot stale 238.5s', 'Chain timestamp missing/invalid'] - retrying fetch
+2026-08-26 11:59:01 | WARNING  | NO_TRADE cycle (stale data): ['Chain timestamp missing/invalid']

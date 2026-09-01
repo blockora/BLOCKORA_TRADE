@@ -1,0 +1,47 @@
+{
+  "max_risk_per_trade_percent": 2,
+  "max_daily_loss_percent": 5,
+  "max_weekly_loss_percent": 10,
+  "max_monthly_loss_percent": 20,
+  "min_risk_reward_ratio": 2.0,
+  "preferred_risk_reward_ratio": 3.0,
+  "max_open_recommendations": 2,
+  "position_sizing": {
+    "low_risk_multiplier": 1.0,
+    "medium_risk_multiplier": 0.5,
+    "high_risk_multiplier": 0.25
+  },
+  "stop_loss": {
+    "method": "structure_based",
+    "max_sl_percent": 5,
+    "atr_multiplier": 1.5
+  },
+  "targets": {
+    "target_1_exit_percent": 30,
+    "target_2_exit_percent": 30,
+    "target_3_exit_percent": 40
+  },
+  "volatility_regimes": {
+    "extreme": {
+      "rsi_threshold": 90,
+      "adx_threshold": 85,
+      "atr_pct_threshold": 0.15
+    },
+    "high": {
+      "rsi_threshold": 70,
+      "adx_threshold": 50,
+      "atr_pct_threshold": 0.05
+    }
+  },
+  "high_volatility_rules": {
+    "position_size_pct": 0.5,
+    "max_holding_minutes": 30,
+    "min_risk_reward": 1.5,
+    "atm_range": 2,
+    "min_oi_change_pct": 10,
+    "volume_multiplier": 1.5,
+    "max_trades_per_hour": 1,
+    "hard_stop_pct": 20,
+    "early_exit_minutes": 10
+  }
+}

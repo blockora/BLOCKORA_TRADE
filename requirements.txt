@@ -1,0 +1,16 @@
+requests
+python-dotenv
+pyyaml
+orjson
+pytz
+loguru
+schedule
+websocket-client
+aiohttp
+sqlalchemy
+pyotp
+ta
+pandas
+numpy
+pycryptodome
+smartapi-python==1.5.5

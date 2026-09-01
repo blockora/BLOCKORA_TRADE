@@ -1,0 +1,64 @@
+2026-08-17 17:02:57 | INFO     | BLOCKORA_TRADE v1.0 starting...
+[I 260817 17:02:58 smartConnect:124] in pool
+2026-08-17 17:02:59 | INFO     | Angel One SmartAPI connected successfully
+2026-08-17 17:03:05 | INFO     | Historical data loaded: 369 candles
+2026-08-17 17:03:07 | INFO     | Option Chain Engine initialized (Multi-Source)
+2026-08-17 17:03:08 | INFO     | Telegram Bot connected
+2026-08-17 17:03:08 | INFO     | Subscription Manager started (polling)
+2026-08-17 17:03:08 | INFO     | System initialization complete
+2026-08-17 17:03:08 | INFO     | BLOCKORA_TRADE started - entering main loop
+2026-08-17 17:04:55 | INFO     | Starting graceful shutdown...
+2026-08-17 17:04:55 | INFO     | Market data connection closed
+2026-08-17 17:04:55 | INFO     | Market engine closed
+2026-08-17 17:04:55 | INFO     | Option Chain Engine shutdown
+2026-08-17 17:04:55 | INFO     | Option engine closed
+2026-08-17 17:04:55 | INFO     | Database saved and closed
+2026-08-17 17:04:56 | INFO     | Graceful shutdown complete
+
+============================================================
+  BLOCKORA_TRADE v1.0
+  AI Powered NIFTY Options Decision Engine
+  Platform: Android Termux
+============================================================
+
+[1/10] Loading Configuration...
+  ✓ Configuration loaded
+[2/10] Initializing Logger...
+  ✓ Logger initialized
+[3/10] Initializing Database...
+  ✓ Database connected
+[4/10] Initializing Market Data Engine...
+  ✓ Market Data Engine ready
+[5/10] Initializing Option Chain Engine...
+  ✓ Option Chain Engine ready
+[6/10] Initializing Analysis Engines...
+  ✓ Analysis Engines ready (30+ modules)
+[7/10] Initializing Telegram Bot...
+  ✓ Telegram Bot connected
+  ✓ Self-Learning Engine active (Outcome Tracker)
+  ✓ Subscription Manager active (₹499/month)
+[8/10] Initializing Health Monitor...
+  ✓ Health Monitor active
+[9/10] Running System Validation...
+  ✓ System validation passed
+[10/10] System Ready!
+
+============================================================
+  SYSTEM STATUS: ✅ READY
+  Mode: production
+  Market: NIFTY Options
+  Policy: RECOMMENDATION ONLY (No Auto Trading)
+============================================================
+
+
+============================================================
+  🛑 NSE MARKET IS CURRENTLY CLOSED
+  ⏳ Market Hours: 09:15 AM to 03:30 PM
+  💤 AI is in Standby Mode (Saving API & Battery)
+  🚀 System will auto-wake tomorrow at 09:15 AM
+============================================================
+
+
+  Shutting down BLOCKORA_TRADE...
+  ✓ Shutdown complete
+

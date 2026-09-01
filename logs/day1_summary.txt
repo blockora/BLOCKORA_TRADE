@@ -1,0 +1,34 @@
+═══════════════════════════════════════════════════
+  BLOCKORA_TRADE v2.0 - DAY 1 REPORT
+  Date: 2026-08-24 (Sunday - Market Closed)
+═══════════════════════════════════════════════════
+
+SYSTEM HEALTH:
+  • Total Cycles: 94
+  • Crashes: 0
+  • Rate Limit Pauses: (check with grep)
+  • Session Refreshes: (check with grep)
+  • Capital Protected: 100%
+
+MARKET CONDITIONS:
+  • RSI Range: 87 → 47 (overbought to neutral)
+  • ADX Range: 69.7 → 15 (high momentum to choppy)
+  • Regime: HIGH_VOLATILITY throughout
+
+DECISIONS:
+  • BUY signals: (count from grep)
+  • WATCHLIST: (count from grep)
+  • NO_TRADE: (count from grep)
+
+VALIDATOR PERFORMANCE:
+  • Rejects: (count from grep)
+  • Most common rejection reasons:
+    - highvol_min_rr (RR weak)
+    - highvol_oi_confirmation (OI change <10%)
+    - highvol_option_type_zone (RSI zone violation)
+
+STRIKE ROTATION:
+  • Total leader changes: (count from grep)
+  • Most common strike: 24200 CE / 24150 CE
+
+═══════════════════════════════════════════════════

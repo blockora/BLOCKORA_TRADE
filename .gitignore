@@ -1,0 +1,10 @@
+.env
+*.env
+__pycache__/
+*.pyc
+*.bak
+node_modules/
+.opencode/node_modules/
+lib/scipy/
+data/OpenAPIScripMaster.json
+database/*.db

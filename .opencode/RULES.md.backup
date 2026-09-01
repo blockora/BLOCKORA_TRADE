@@ -1,0 +1,54 @@
+# BLOCKORA_TRADE - OpenCode Rules
+
+## 🚨 CRITICAL SECURITY RULES (ABSOLUTELY MUST FOLLOW)
+1. NEVER READ .env FILE - Contains API keys and passwords. DO NOT cat, view, or read .env under ANY circumstances.
+2. NEVER LOG SECRETS - Do not print or log any API keys, passwords, tokens, or credentials.
+3. NEVER MODIFY .env - Configuration file is read-only for security.
+
+## STRICT CODING RULES
+1. ONE FILE AT A TIME - Only modify the specific file mentioned
+2. SHOW BEFORE EDIT - Show current code before changing
+3. NO EXTRA FEATURES - Do not add new features/files/dependencies
+4. MINIMAL CHANGES - Smallest possible change only
+5. PRESERVE LOGGING - Keep all logger calls intact
+6. TEST FIRST - Explain how to test before applying
+7. ROLLBACK PLAN - Provide revert command for every change
+
+## PROJECT INFO
+- Name: BLOCKORA_TRADE v1.0
+- Platform: Android Termux (Ubuntu proot)
+- Language: Python 3.14
+- Mode: RECOMMENDATION ONLY (No Auto Trading)
+
+## FILE STRUCTURE & PERMISSIONS
+- .env - 🔒 FORBIDDEN (NEVER READ/MODIFY)
+- main.py - Entry point (DO NOT MODIFY unless asked)
+- config/config.json - Configuration (DO NOT MODIFY)
+- data/market_data_engine.py - Angel One API (CAN MODIFY)
+- data/option_chain_engine.py - Option chain (CAN MODIFY)
+- data/jugaad_data_fetcher.py - NSE scraper (CAN MODIFY)
+- core/ - Core modules (DO NOT MODIFY unless asked)
+- analysis/ - AI engines (DO NOT MODIFY unless asked)
+
+## CURRENT STATUS
+- Angel One SmartAPI: WORKING (smartapi.angelone.in)
+- Scrip Master: WORKING (cached locally)
+- Option Chain: WORKS for 10 cycles, FAILS on cycle 11
+- IV/Greeks: WORKING via Jugaad-data (NSE scraper)
+- Telegram: WORKING but slow shutdown (16 seconds)
+
+## KNOWN ISSUES
+1. "Chain timestamp missing/invalid" on cycle 11
+2. Rate limiting after ~10 API calls
+3. Slow shutdown (Telegram timeout)
+4. Stale data threshold too strict
+
+## WORKING API ENDPOINTS
+- Angel One Login: https://smartapi.angelone.in
+- Scrip Master: https://smartapi.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json
+- NSE Option Chain: https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY
+
+## DEAD API ENDPOINTS (DO NOT USE)
+- https://margincalculator.angelbroking.com (404)
+- https://margincalculator.angelone.in (404)
+- https://apiconnect.angelone.in (timeout on mobile)
