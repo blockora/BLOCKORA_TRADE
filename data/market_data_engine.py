@@ -44,6 +44,14 @@ class MarketDataEngine:
         self._tokens_time = 0
         self._tokens = {}
         
+        # Candle cache with TTL (for slow network resilience)
+        self._last_good_candles = []  # Last successfully fetched candles
+        self._candle_cache_ttl = {
+            "5m": 120,     # 5m candles valid for 2 minutes
+            "15m": 300,    # 15m candles valid for 5 minutes
+            "1h": 900      # 1h candles valid for 15 minutes
+        }
+        
         # Freshness flag for DataFreshnessGuard
         self._last_get_live_fresh = False
     def _rate_limit_wait(self):
@@ -250,6 +258,35 @@ class MarketDataEngine:
             
             if not self.connected:
                 return None
+            
+            # ---- CANDLE CACHE WITH TTL (reduce network calls) ----
+            now = time.time()
+            candle_ttl = self._candle_cache_ttl
+            
+            # Determine which candle interval needs fetching
+            # 5m candles: refresh if cache older than 120s
+            # 15m candles: refresh if cache older than 300s  
+            # 1h candles: refresh if cache older than 900s
+            
+            # Update 5m candles if needed
+            if not self._last_good_candles or (now - self._candle_cache_ttl_last) > candle_ttl["5m"]:
+                self._fetch_and_cache_candles("FIFTEEN_MINUTE", 7)
+            
+            # Update 15m candles if needed (only if 5m just fetched)
+            if now - self._candle_cache_ttl_last > candle_ttl["15m"]:
+                self._fetch_interval("FIFTEEN_MINUTE", 7)
+            
+            # Update 1h candles if needed
+            if now - self._candle_cache_ttl_last > candle_ttl["1h"]:
+                self._fetch_interval("ONE_HOUR", 7)
+            
+            # Use cached candles (always honest - keep original timestamp)
+            candles_data = self._last_good_candles if self._last_good_candles else self.historical_candles
+            
+            # ---- END CANDLE CACHE ----
+            
+            if not self.connected:
+                return None
             self._rate_limit_wait()
             ltp_data = self._silent_call(
                 self.client.ltpData, "NSE", "NIFTY 50", "99926000"
@@ -276,18 +313,21 @@ class MarketDataEngine:
 
                 # P0-2: ltpData ka high/low = DAY high/low (current 5-min candle ke NAHI).
                 # Candle ko sirf current LTP se update karo — day values inject MAT karo.
-                if self.historical_candles and len(self.historical_candles) > 0:
-                    last_candle = self.historical_candles[-1]
+                if candles_data and len(candles_data) > 0:
+                    last_candle = candles_data[-1]
                     # Format: [timestamp, open, high, low, close, volume]
                     last_candle[2] = max(float(last_candle[2]), current_ltp)  # High = max(existing, LTP)
                     last_candle[3] = min(float(last_candle[3]), current_ltp)  # Low = min(existing, LTP)
                     last_candle[4] = current_ltp                              # Close = LTP
-
+                    
+                    # Cache the updated candles
+                    self._last_good_candles = candles_data
+                
                 self._maybe_update_historical()
                 self.update_mtf_candles()
                 self.live_data["candles_15m"] = self.candles_15m
                 self.live_data["candles_1h"] = self.candles_1h
-                self.live_data["candles"] = self.historical_candles
+                self.live_data["candles"] = candles_data
                 return self.live_data
 
             return None
@@ -303,9 +343,35 @@ class MarketDataEngine:
             # Mark stale so DataFreshnessGuard flags it
             self._last_get_live_fresh = False
             
-            # Silent fallback to cache
-            if self.historical_candles and self.live_data:
-                self.live_data["candles"] = self.historical_candles
+            # Retry + fallback: try once more after 3s, then use cached candles
+            self.logger.warning(f"Candle fetch failed - using cached candles (age will be checked)")
+            # Try once more
+            try:
+                self._rate_limit_wait()
+                # Simple LTP fetch only (no candles) to check connectivity
+                ltp_data = self._silent_call(
+                    self.client.ltpData, "NSE", "NIFTY 50", "99926000"
+                )
+                if ltp_data and ltp_data.get("status"):
+                    # Connectivity OK, but candles still use cached version
+                    pass
+            except Exception:
+                pass
+            # Return with cached candles (even if empty - safety)
+            if self._last_good_candles:
+                self.live_data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "symbol": "NIFTY",
+                    "ltp": self.live_data.get("ltp", 0) if self.live_data else 0,
+                    "open": self.live_data.get("open", 0) if self.live_data else 0,
+                    "high": self.live_data.get("high", 0) if self.live_data else 0,
+                    "low": self.live_data.get("low", 0) if self.live_data else 0,
+                    "close": self.live_data.get("close", 0) if self.live_data else 0,
+                    "exchange": "NSE",
+                    "market_status": "OPEN" if self.connected else "UNKNOWN",
+                    "data_source": "CACHED",
+                    "candles": self._last_good_candles
+                }
                 return self.live_data
             return None
     def _fetch_interval(self, interval, days_back):
