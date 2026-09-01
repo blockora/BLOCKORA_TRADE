@@ -25,6 +25,10 @@ class StrikeRankingEngine:
         Main method - returns best CE and PE strikes
         """
         self.logger.info("=== Adaptive Strike Ranking Started ===")
+    def rank(self, analysis_results, confidence=None):
+        """Wrapper for backward compatibility - calls rank_strikes()"""
+        return self.rank_strikes(analysis_results)
+
 
         market_data = analysis_results.get("market_data", {})
         option_chain = analysis_results.get("option_chain", {})
