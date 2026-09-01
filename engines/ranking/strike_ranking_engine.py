@@ -265,7 +265,7 @@ class StrikeRankingEngine:
         score = 0
 
         if ch_oi > 0:
-            score += min(4, int(ch_oi / 2000))
+            score += min(6, int(ch_oi / 1500))
 
         neighbor_oi = []
         for s in [strike-50, strike+50]:
@@ -274,6 +274,9 @@ class StrikeRankingEngine:
 
         if neighbor_oi and oi > max(neighbor_oi) * 1.5:
             score += 3
+
+        if oi >= 100000:
+            score += 1
 
         if pcr > 1.5 and opt_type == "CE":
             score += 2
