@@ -67,4 +67,4 @@ This is a Decision Support System only. It does not guarantee profits.
 Trading involves risk. Always trade responsibly.
 
 ---
-**Version:** 2.1 | **Status:** Production Ready ✅
+**Version:** 2.1 | **Status:** Production Ready ✅ 
