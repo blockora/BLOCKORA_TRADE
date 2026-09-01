@@ -5644,3 +5644,179 @@
 2026-09-01 12:02:48 | INFO     | core.logger_manager:info:69 - Option engine closed
 2026-09-01 12:02:48 | INFO     | core.logger_manager:info:69 - Database saved and closed
 2026-09-01 12:02:49 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-01 13:33:38 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_1.0<2.0']
+2026-09-01 13:33:38 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_2.0<2.0']
+2026-09-01 13:50:20 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-01 13:50:21 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-01 13:50:21 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-01 13:50:22 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-01 13:50:24 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-09-01 13:50:24 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-01 13:50:24 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-01 13:50:24 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-01 13:50:25 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-01 13:51:18 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 13:51:18 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 13:51:19 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 0
+2026-09-01 13:51:19 | INFO     | core.logger_manager:info:69 - Data freshness check: Chain timestamp missing/invalid
+2026-09-01 13:51:20 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - Chain timestamp missing/invalid
+2026-09-01 13:53:09 | INFO     | core.logger_manager:info:69 - Cache expiry changed:  → 01SEP2026, using available cache
+2026-09-01 13:53:09 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 13:53:09 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 13:53:11 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 0
+2026-09-01 13:53:11 | INFO     | core.logger_manager:info:69 - Data freshness check: Chain timestamp missing/invalid
+2026-09-01 13:53:11 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - Chain timestamp missing/invalid
+2026-09-01 13:54:59 | INFO     | core.logger_manager:info:69 - Cache expiry changed:  → 01SEP2026, using available cache
+2026-09-01 13:54:59 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 13:54:59 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 13:55:00 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 0
+2026-09-01 13:55:00 | INFO     | core.logger_manager:info:69 - Data freshness check: Chain timestamp missing/invalid
+2026-09-01 13:55:04 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - Chain timestamp missing/invalid
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-01 13:55:13 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-01 13:55:14 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-01 14:18:40 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 14:18:41 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 14:18:42 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 14:18:42 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 14:18:42 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 14:20:59 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_1.0<2.0']
+2026-09-01 14:20:59 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_2.0<2.0']
+2026-09-01 14:27:14 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-01 14:27:26 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-01 14:27:32 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-01 14:27:36 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-01 14:27:39 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-09-01 14:27:39 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-01 14:27:39 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-01 14:27:39 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-01 14:27:39 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-01 14:28:32 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 14:28:32 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 14:28:33 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 14:28:33 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 14:28:33 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 14:28:38 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.42
+2026-09-01 14:28:38 | INFO     | core.logger_manager:info:69 - Data freshness check: No candles
+2026-09-01 14:28:46 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - No candles
+2026-09-01 14:30:38 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 14:30:38 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 14:30:39 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 14:30:39 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 14:30:39 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 14:30:44 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.37
+2026-09-01 14:30:44 | INFO     | core.logger_manager:info:69 - Data freshness check: No candles
+2026-09-01 14:30:52 | INFO     | core.logger_manager:info:69 - Liquidity: removed 2 illiquid strikes, kept 60
+2026-09-01 14:30:52 | INFO     | core.logger_manager:info:69 - Market Regime: HIGH_VOLATILITY | ADX:69.2 RSI:26.9 ATR%:0.08
+2026-09-01 14:30:52 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'StrikeRankingEngine' object has no attribute 'rank'
+2026-09-01 14:32:41 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 14:32:41 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 14:32:42 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 14:32:42 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 14:32:42 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 14:32:47 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.37
+2026-09-01 14:32:47 | INFO     | core.logger_manager:info:69 - Liquidity: removed 2 illiquid strikes, kept 60
+2026-09-01 14:32:47 | INFO     | core.logger_manager:info:69 - Market Regime: HIGH_VOLATILITY | ADX:69.2 RSI:28.3 ATR%:0.08
+2026-09-01 14:32:47 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'StrikeRankingEngine' object has no attribute 'rank'
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-01 14:32:56 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-01 14:32:57 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-01 15:14:22 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_1.0<2.0']
+2026-09-01 15:14:22 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_2.0<2.0']
+2026-09-01 15:14:25 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:14:25 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:14:26 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:14:26 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:19:00 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-01 15:19:01 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-01 15:19:02 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-01 15:19:03 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-01 15:19:05 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-09-01 15:19:05 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-01 15:19:05 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-01 15:19:05 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-01 15:19:05 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-01 15:20:00 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 15:20:01 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 15:20:02 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 15:20:02 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 15:20:02 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 15:20:07 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.35
+2026-09-01 15:20:07 | INFO     | core.logger_manager:info:69 - Liquidity: removed 2 illiquid strikes, kept 60
+2026-09-01 15:20:07 | INFO     | core.logger_manager:info:69 - Market Regime: HIGH_VOLATILITY | ADX:16.2 RSI:52.2 ATR%:0.09
+2026-09-01 15:20:07 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:20:07 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
+2026-09-01 15:21:59 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 15:21:59 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 15:22:01 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 15:22:01 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 15:22:01 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 15:22:06 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.35
+2026-09-01 15:22:06 | INFO     | core.logger_manager:info:69 - Liquidity: removed 2 illiquid strikes, kept 60
+2026-09-01 15:22:06 | INFO     | core.logger_manager:info:69 - Market Regime: HIGH_VOLATILITY | ADX:75.7 RSI:82.5 ATR%:0.13
+2026-09-01 15:22:06 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:22:06 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
+2026-09-01 15:22:10 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-01 15:22:10 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-01 15:22:10 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-01 15:22:10 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-01 15:22:11 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-01 15:22:11 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-01 15:22:11 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-01 15:24:38 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-01 15:24:39 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-01 15:24:40 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-01 15:24:41 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-01 15:24:43 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 01-Sep-2026
+2026-09-01 15:24:43 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-01 15:24:43 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-01 15:24:43 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-01 15:24:43 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-01 15:25:35 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 15:25:35 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 15:25:36 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 15:25:36 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 15:25:36 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 15:25:41 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.35
+2026-09-01 15:25:41 | INFO     | core.logger_manager:info:69 - Data freshness check: No candles
+2026-09-01 15:25:49 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - No candles
+2026-09-01 15:27:45 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 15:27:45 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 15:27:46 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 15:27:46 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 15:27:46 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 15:27:52 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.35
+2026-09-01 15:27:52 | INFO     | core.logger_manager:info:69 - Data freshness check: No candles
+2026-09-01 15:28:00 | WARNING  | core.logger_manager:warning:72 - 🛡️ NO_TRADE: Capital protected - No candles
+2026-09-01 15:30:00 | INFO     | core.logger_manager:info:69 - Using local scrip master file (no download needed)...
+2026-09-01 15:30:00 | INFO     | core.logger_manager:info:69 - Local scrip master has content, extracting tokens - SKIPPING download
+2026-09-01 15:30:10 | INFO     | core.logger_manager:info:69 - Auto-detected expiry from file: 29SEP2026 (available: ['29SEP2026', '29DEC2026', '30MAR2027'])
+2026-09-01 15:30:10 | INFO     | core.logger_manager:info:69 - Tokens extracted from local master: 208
+2026-09-01 15:30:10 | INFO     | core.logger_manager:info:69 - Local file has these NIFTY expiries: ['29DEC2026', '29JUN2027', '29SEP2026', '30MAR2027', '31DEC2030']
+2026-09-01 15:30:16 | INFO     | core.logger_manager:info:69 - Angel LIVE chain ready: 31 strikes | PCR 1.36
+2026-09-01 15:30:16 | INFO     | core.logger_manager:info:69 - Liquidity: removed 2 illiquid strikes, kept 60
+2026-09-01 15:30:16 | INFO     | core.logger_manager:info:69 - Market Regime: HIGH_VOLATILITY | ADX:75.7 RSI:67.8 ATR%:0.13
+2026-09-01 15:30:16 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 15:30:16 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
+2026-09-01 15:32:59 | INFO     | core.logger_manager:info:69 - Market CLOSED - Stopping analysis
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-01 15:33:16 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-01 15:33:17 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-01 16:08:06 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_1.0<2.0']
+2026-09-01 16:08:06 | WARNING  | core.logger_manager:warning:72 - Validator REJECT: ['rr_2.0<2.0']
+2026-09-01 16:08:08 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 16:08:09 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 16:08:09 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-01 16:08:09 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===

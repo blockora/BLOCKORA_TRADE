@@ -1,1 +1,0 @@
-"""engines.candlestick module"""

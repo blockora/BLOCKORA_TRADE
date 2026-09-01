@@ -57,3 +57,8 @@
 2026-08-19 11:43:57 | ERROR    | core.logger_manager:error:50 - Initialization failed: HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Read timed out. (read timeout=7)
 2026-08-21 13:04:39 | ERROR    | core.logger_manager:error:50 - Market data init error: HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Read timed out. (read timeout=7)
 2026-08-21 13:04:39 | ERROR    | core.logger_manager:error:50 - Initialization failed: HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Read timed out. (read timeout=7)
+2026-09-01 14:30:52 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'StrikeRankingEngine' object has no attribute 'rank'
+2026-09-01 14:32:47 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'StrikeRankingEngine' object has no attribute 'rank'
+2026-09-01 15:20:07 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
+2026-09-01 15:22:06 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
+2026-09-01 15:30:16 | ERROR    | core.logger_manager:error:75 - Analysis cycle error: 'NoneType' object has no attribute 'get'
