@@ -8,3 +8,4 @@ node_modules/
 lib/scipy/
 data/OpenAPIScripMaster.json
 database/*.db
+__pycache__/
