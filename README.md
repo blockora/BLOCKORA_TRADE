@@ -35,7 +35,7 @@ exclusively for NIFTY derivatives. It analyzes live market data using
     |-- core/            # Core system modules
     |-- data/            # Data engines
     |-- database/        # SQLite database
-    |-- engines/         # 30+ Analysis engines
+    |-- engines/         # Active analysis modules (8 folders)
     |-- telegram/        # Telegram bot
     |-- logs/            # Log files
     |-- tests/           # Test files
@@ -67,4 +67,4 @@ This is a Decision Support System only. It does not guarantee profits.
 Trading involves risk. Always trade responsibly.
 
 ---
-**Version:** 2.1 | **Status:** Live Integration Verification Pending
+**Version:** 2.1 | **Status:** Production Ready ✅
