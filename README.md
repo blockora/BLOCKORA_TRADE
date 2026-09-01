@@ -36,8 +36,6 @@ exclusively for NIFTY derivatives. It analyzes live market data using
     |-- data/            # Data engines
     |-- database/        # SQLite database
     |-- engines/         # 30+ Analysis engines
-    |-- models/          # Data models
-    |-- strategies/      # Trading strategies
     |-- telegram/        # Telegram bot
     |-- logs/            # Log files
     |-- tests/           # Test files
