@@ -4,8 +4,13 @@ from datetime import datetime
 
 
 class DataFreshnessGuard:
-    SPOT_MAX_SEC = 90
-    CHAIN_MAX_SEC = 15
+    # Thresholds for data freshness validation
+    # These can be overridden via config:
+    #   freshness.spot_max_age_seconds (default: 60)
+    #   freshness.chain_max_age_seconds (default: 60)
+    # Candles threshold remains 20min (market hours only)
+    SPOT_MAX_SEC = 60
+    CHAIN_MAX_SEC = 60
     CANDLE_MAX_MIN = 20
 
     def __init__(self, logger=None):
