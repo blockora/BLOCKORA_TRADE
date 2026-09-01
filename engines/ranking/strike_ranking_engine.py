@@ -24,6 +24,16 @@ class StrikeRankingEngine:
         """
         Main method - returns best CE and PE strikes
         """
+        # Safety checks for None/missing data
+        if not analysis_results:
+            return {"best_ce": {}, "best_pe": {}, "ce_rankings": [], "pe_rankings": []}
+        analysis_results.setdefault("market_data", {})
+        analysis_results.setdefault("option_chain", {})
+        analysis_results.setdefault("trade_context", {})
+        analysis_results.setdefault("multi_timeframe", {})
+        analysis_results.setdefault("indicators", {})
+        analysis_results.setdefault("learning", {})
+        
         self.logger.info("=== Adaptive Strike Ranking Started ===")
     def rank(self, analysis_results, confidence=None):
         """Wrapper for backward compatibility - calls rank_strikes()"""
