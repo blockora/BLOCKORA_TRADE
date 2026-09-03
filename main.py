@@ -489,6 +489,14 @@ class BlockoraTrade:
             if not fresh:
                 # Format user-friendly reasons
                 reason_str = ", ".join(stale_reasons)
+
+            if stale_reasons:
+                sep = "=" * 60
+                print(f"
+{separator}")
+                print(f"  🛡️ CYCLE #{{self.cycle_count + 1}} | NO TRADE (Safety)")
+                print(f"  📊 Spot: {{market_data.get('ltp', N/A)}}")
+                print(f"  🛑 Reason: {{,
                 self.logger.info(f"Data freshness check: {reason_str}")
                 
                 # If outside market hours, explain why
@@ -506,7 +514,28 @@ class BlockoraTrade:
             if not fresh:
                 # Show clear reason for NO_TRADE
                 reason_str = ", ".join(stale_reasons)
+
+            if stale_reasons:
+                sep = "=" * 60
+                print(f"
+{separator}")
+                print(f"  🛡️ CYCLE #{{self.cycle_count + 1}} | NO TRADE (Safety)")
+                print(f"  📊 Spot: {{market_data.get('ltp', N/A)}}")
+                print(f"  🛑 Reason: {{,
                 self.logger.warning(f"🛡️ NO_TRADE: Capital protected - {reason_str}")
+                return None
+
+            if stale_reasons:
+                cycle_num = self.cycle_count + 1
+                separator = "=" * 60
+                print(f"
+{separator}")
+                print(f"  🛡️ CYCLE #{cycle_num} | NO TRADE (Safety)")
+                print(f"  📊 Spot: {{market_data.get('ltp', 'N/A')}}")
+                print(f"  🛑 Reason: {{', '.join(stale_reasons)}}")
+                if market_data.get("synthetic_candles"):
+                    print(f"  ⚠️ Candles: synthetic baseline (RSI neutral)")
+                print(f"{separator}")
                 return None
 
             if not option_chain:

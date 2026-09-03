@@ -39,7 +39,11 @@ class DataFreshnessGuard:
         in_market = force_market if force_market is not None else (555 <= hm <= 930)
         candles = market_data.get("candles", [])
         if not candles:
-            reasons.append("No candles")
+            chain_ts = (option_chain or {}).get("timestamp", "")
+            if chain_ts:
+                reasons.append("Candles: synthetic baseline (RSI neutral)")
+            else:
+                reasons.append("No candles")
         elif in_market:
             try:
                 last_ts = str(candles[-1][0])

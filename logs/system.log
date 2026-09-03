@@ -5832,3 +5832,59 @@
 2026-09-02 02:57:18 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
 2026-09-02 02:57:18 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
 2026-09-02 02:57:18 | INFO     | core.logger_manager:info:69 - === Adaptive Strike Ranking Started ===
+2026-09-02 09:26:02 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-02 09:26:41 | WARNING  | core.logger_manager:warning:72 - Login attempt 1/3 failed: HTTPSConnectionPool(host='apiconnect.angelone.in', port=443): Max retries exceeded with url: /rest/auth/angelbroking/user/v1/loginByPassword (Caused by ConnectTimeoutError(<HTTPSConnection(host='apiconnect.angelone.in', port=443) at 0x7ac2f88410>, 'Connection to apiconnect.angelone.in timed out. (connect timeout=7)'))
+2026-09-02 09:26:44 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-02 09:26:47 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-02 09:26:48 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-02 09:26:51 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 08-Sep-2026
+2026-09-02 09:26:51 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-02 09:26:51 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-02 09:26:51 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-02 09:26:51 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-02 09:26:52 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 09:27:53 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 09:28:53 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-02 09:29:06 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-02 09:29:07 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-02 10:13:19 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-02 10:13:20 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-02 10:13:21 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-02 10:13:22 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-02 10:13:25 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 08-Sep-2026
+2026-09-02 10:13:25 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-02 10:13:25 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-02 10:13:25 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-02 10:13:25 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-02 10:13:26 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 10:14:27 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 10:14:49 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-02 10:14:50 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-02 10:14:50 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-02 10:14:50 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-02 10:14:50 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-02 10:14:50 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-02 10:14:51 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
+2026-09-02 11:02:08 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE v1.0 starting...
+2026-09-02 11:02:09 | INFO     | core.logger_manager:info:69 - Angel One SmartAPI connected successfully
+2026-09-02 11:02:10 | INFO     | core.logger_manager:info:69 - Option Chain Engine initialized (Multi-Source)
+2026-09-02 11:02:11 | INFO     | core.logger_manager:info:69 - Telegram Bot connected
+2026-09-02 11:02:13 | INFO     | core.logger_manager:info:69 - JugaadIVFetcher expiry auto-set: 08-Sep-2026
+2026-09-02 11:02:13 | INFO     | core.logger_manager:info:69 - Subscription Manager started (polling)
+2026-09-02 11:02:14 | INFO     | core.logger_manager:info:69 - System initialization complete
+2026-09-02 11:02:14 | INFO     | core.logger_manager:info:69 - BLOCKORA_TRADE started - entering main loop
+2026-09-02 11:02:14 | INFO     | core.logger_manager:info:69 - Market OPENED - Starting analysis
+2026-09-02 11:02:15 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 11:03:15 | WARNING  | core.logger_manager:warning:72 - Candle fetch failed - using cached candles (age will be checked)
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Starting graceful shutdown...
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Market data connection closed
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Market engine closed
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Option Chain Engine shutdown
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Option engine closed
+2026-09-02 11:03:19 | INFO     | core.logger_manager:info:69 - Database saved and closed
+2026-09-02 11:03:20 | INFO     | core.logger_manager:info:69 - Graceful shutdown complete
