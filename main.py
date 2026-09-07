@@ -484,25 +484,16 @@ class BlockoraTrade:
                     option_chain = live_chain
                     self.logger.info(f"Angel LIVE chain ready: {len(live_chain['ce_data'])} strikes | PCR {live_chain['pcr']}")
 
-            # 🕐 DATA FRESHNESS GUARD: stale data = NO_TRADE
+# 🕐 DATA FRESHNESS GUARD: stale data = NO_TRADE
             fresh, stale_reasons = self.freshness_guard.check(market_data, option_chain)
             if not fresh:
                 # Format user-friendly reasons
                 reason_str = ", ".join(stale_reasons)
 
-            if stale_reasons:
-                sep = "=" * 60
-                print(f"
-{separator}")
-                print(f"  🛡️ CYCLE #{{self.cycle_count + 1}} | NO TRADE (Safety)")
-                print(f"  📊 Spot: {{market_data.get('ltp', N/A)}}")
-                print(f"  🛑 Reason: {{,
-                self.logger.info(f"Data freshness check: {reason_str}")
-                
                 # If outside market hours, explain why
                 if not self.is_market_open():
                     self.logger.info("🛑 Market is currently closed - data freshness checks limited")
-                
+
                 # Retry fetch once with fresh broker data
                 market_data = self.market_engine.get_live_data() or market_data
                 # P0-2: mark_fetch SIRF fresh broker response par (cached par NEVER)
@@ -511,28 +502,18 @@ class BlockoraTrade:
                 else:
                     market_data["data_source"] = "CACHE"
                 fresh, stale_reasons = self.freshness_guard.check(market_data, option_chain)
+
             if not fresh:
                 # Show clear reason for NO_TRADE
                 reason_str = ", ".join(stale_reasons)
 
             if stale_reasons:
-                sep = "=" * 60
-                print(f"
-{separator}")
-                print(f"  🛡️ CYCLE #{{self.cycle_count + 1}} | NO TRADE (Safety)")
-                print(f"  📊 Spot: {{market_data.get('ltp', N/A)}}")
-                print(f"  🛑 Reason: {{,
-                self.logger.warning(f"🛡️ NO_TRADE: Capital protected - {reason_str}")
-                return None
-
-            if stale_reasons:
                 cycle_num = self.cycle_count + 1
                 separator = "=" * 60
-                print(f"
-{separator}")
+                print(f"\n{separator}")
                 print(f"  🛡️ CYCLE #{cycle_num} | NO TRADE (Safety)")
-                print(f"  📊 Spot: {{market_data.get('ltp', 'N/A')}}")
-                print(f"  🛑 Reason: {{', '.join(stale_reasons)}}")
+                print(f"  📊 Spot: {market_data.get('ltp', 'N/A')}")
+                print(f"  🛑 Reason: {', '.join(stale_reasons)}")
                 if market_data.get("synthetic_candles"):
                     print(f"  ⚠️ Candles: synthetic baseline (RSI neutral)")
                 print(f"{separator}")

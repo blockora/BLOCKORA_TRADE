@@ -54,6 +54,10 @@ class MarketDataEngine:
         
         # Freshness flag for DataFreshnessGuard
         self._last_get_live_fresh = False
+
+        # Candle cache timestamp tracking
+        self._candle_cache_ttl_last = 0
+
     def _rate_limit_wait(self):
         """Wait with exponential backoff and rolling minute rate limiting."""
         now = time.time()
@@ -270,7 +274,7 @@ class MarketDataEngine:
             
             # Update 5m candles if needed
             if not self._last_good_candles or (now - self._candle_cache_ttl_last) > candle_ttl["5m"]:
-                self._fetch_and_cache_candles("FIFTEEN_MINUTE", 7)
+                self._fetch_and_cache_candles("FIVE_MINUTE", 7)
             
             # Update 15m candles if needed (only if 5m just fetched)
             if now - self._candle_cache_ttl_last > candle_ttl["15m"]:
@@ -344,7 +348,15 @@ class MarketDataEngine:
             self._last_get_live_fresh = False
             
             # Retry + fallback: try once more after 3s, then use cached candles
-            self.logger.warning(f"Candle fetch failed - using cached candles (age will be checked)")
+            # Log actual error type and sanitized message for diagnostics (no secrets)
+            err_type = type(e).__name__
+            err_msg = str(e)
+            # Sanitize: remove potential tokens/keys from error message
+            sanitized = err_msg.replace(self.config.get("ANGEL_API_KEY", ""), "[REDACTED]")
+            sanitized = sanitized.replace(self.config.get("ANGEL_CLIENT_ID", ""), "[REDACTED]")
+            sanitized = sanitized.replace(self.config.get("ANGEL_PASSWORD", ""), "[REDACTED]")
+            sanitized = sanitized.replace(self.config.get("ANGEL_TOTP_SECRET", ""), "[REDACTED]")
+            self.logger.warning(f"Candle fetch failed [{err_type}]: {sanitized} - using cached candles (age will be checked)")
             # Try once more
             try:
                 self._rate_limit_wait()
@@ -390,6 +402,31 @@ class MarketDataEngine:
                 return raw if isinstance(raw, list) else raw.get("candles", [])
         except Exception:
             pass
+        return []
+
+    def _fetch_and_cache_candles(self, interval, days_back):
+        """Fetch candles for the given interval and cache as primary (5m) candles.
+        Updates _last_good_candles and _candle_cache_ttl_last on success."""
+        try:
+            now = datetime.now()
+            params = {
+                "exchange": "NSE",
+                "symboltoken": "99926000",
+                "interval": interval,
+                "fromdate": (now - timedelta(days=days_back)).strftime("%Y-%m-%d %H:%M"),
+                "todate": now.strftime("%Y-%m-%d %H:%M")
+            }
+            data = self._silent_call(self.client.getCandleData, params)
+            if data and data.get("status"):
+                raw = data["data"]
+                candles = raw if isinstance(raw, list) else raw.get("candles", [])
+                if candles:
+                    self._last_good_candles = candles
+                    self._candle_cache_ttl_last = time.time()
+                    self.logger.debug(f"Cached {len(candles)} {interval} candles")
+                    return candles
+        except Exception as e:
+            self.logger.debug(f"_fetch_and_cache_candles({interval}) failed: {e}")
         return []
 
     def update_mtf_candles(self):

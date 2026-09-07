@@ -1,4 +1,4 @@
-"""Full System Health Check - syntax, imports, DB, config, env"""
+"""Health check module - performs full system health checks including syntax, imports, database, config, and environment validation."""
 import os, sys, py_compile, sqlite3, json
 sys.path.insert(0, '.')
 
