@@ -1,3 +1,12 @@
+# BLOCKORA_TRADE — dependencies
+#
+# Portable across Android/Termux (aarch64, CPython 3.11–3.14) and desktop Linux/macOS.
+# Versions are left unpinned unless a pin is load-bearing, so Termux resolves
+# against its own platform wheels instead of a desktop-only sdist.
+#
+# Install:  pip install -r requirements.txt
+
+# --- Core runtime (required) ------------------------------------------------
 requests
 python-dotenv
 pyyaml
@@ -9,13 +18,45 @@ websocket-client
 aiohttp
 sqlalchemy
 pyotp
-ta
-pandas
-numpy
+
+# tzdata — REQUIRED, not optional.
+# core/session.py and pipeline/data_sources.py call ZoneInfo("Asia/Kolkata") at
+# MODULE IMPORT time. Termux ships no system zoneinfo database, so without this
+# wheel the import raises ZoneInfoNotFoundError and the process cannot start.
+tzdata
+
 pycryptodome
 smartapi-python==1.5.5
 # smartapi-python 1.5.5 imports logzero but does NOT declare it in its
 # package metadata -> pip check passes, runtime import fails without this.
 logzero
-psutil          # optional system health metrics (core/system_health.py degrades gracefully without it)
+
+# --- Broker ---------------------------------------------------------------
+# Angel One SmartAPI. 1.5.5 is pinned deliberately: the import surface
+# (SmartConnect) and the market-data field names this engine reads
+# (opnInterest / changeinOpenInterest / tradeVolume) are broker-version specific.
+
+# --- Test ------------------------------------------------------------------
 pytest          # documented test runner (README: python3 -m pytest tests/)
+
+# --- Optional runtime -------------------------------------------------------
+# psutil — core/system_health.py imports it in a try/except and degrades
+#          gracefully to "metrics unavailable" when absent. Declared so the
+#          health module has a real chance to work; the app runs fine without it.
+psutil
+
+# --- Deliberately NOT dependencies -----------------------------------------
+# pandas  — used only by engines/ranking/greeks.py::add_greeks_to_df(), which is
+#           never called by the live cycle (its import is lazy). Not declared, so
+#           Termux installs do not pull a large binary that has no wheel for the
+#           running Python. Install it yourself only if you use that helper.
+# numpy   — transitive: needed only alongside pandas. Not declared.
+# scipy   — not imported anywhere in this codebase. Not declared.
+# nsepython — not imported anywhere and not declared. If you install it manually
+#           pip will report that it requires scipy; that is nsepython's own
+#           dependency and it is not on the live path. Do not add either to
+#           silence that warning.
+#
+# Removed: ta (technical-analysis). It was never imported by any module in this
+# repository and it transitively forced numpy + pandas onto every Termux
+# install. Removed rather than version-pinned because no code depends on it.

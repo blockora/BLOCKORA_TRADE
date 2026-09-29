@@ -58,14 +58,46 @@ def test_filter_catalogue_matches_docs(cfg):
     assert f["calibration_gate"]["enabled"] is False  # dormant until Phase 8
 
 
-def test_credentials_come_from_env_only(monkeypatch):
+CREDENTIAL_KEYS = (
+    "ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET",
+    "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID",
+)
+
+
+def test_credentials_absent_when_env_unset(monkeypatch):
+    """With a clean environment, every credential must read back as None.
+
+    Real credentials are often exported in the developer's shell (e.g. on
+    Termux), which would make this test pass/fail on host state. Clear them
+    explicitly so the assertion tests the code, not the machine.
+    No credential value is ever read, printed or asserted here.
+    """
     from core.config import get_credentials
+    for key in CREDENTIAL_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    creds = get_credentials()
+    for key in CREDENTIAL_KEYS:
+        assert creds[key] is None, f"{key} must be absent from a clean env"
+
+
+def test_credentials_come_from_env_only(monkeypatch):
+    """A credential set in the environment is visible; nothing else provides it.
+
+    Uses a throwaway sentinel, never a real secret. Values are compared, not
+    printed.
+    """
+    from core.config import get_credentials
+    for key in CREDENTIAL_KEYS:
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("ANGEL_API_KEY", "test-key")
     creds = get_credentials()
     assert creds["ANGEL_API_KEY"] == "test-key"
-    assert creds["TELEGRAM_BOT_TOKEN"] is None
+    # every other credential stays absent -> sourced from env only, one key each
+    for key in CREDENTIAL_KEYS:
+        if key != "ANGEL_API_KEY":
+            assert creds[key] is None
     # credentials must never appear in the YAML configs
-    import yaml
     for name in ("settings", "weights", "filters"):
         raw = (Path(__file__).resolve().parent.parent / "config" / f"{name}.yaml").read_text()
-        assert "ANGEL_API_KEY" not in raw
+        for key in CREDENTIAL_KEYS:
+            assert key not in raw, f"{key} must not be hardcoded in config/{name}.yaml"

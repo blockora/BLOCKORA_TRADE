@@ -214,13 +214,16 @@ HIST_NO_OUTCOME = {
 
 
 @pytest.fixture
-def mem():
-    db_path = "/tmp/test_historical_mem.db"
+def mem(tmp_path):
+    # Use pytest's writable temp dir. Hardcoding /tmp breaks on platforms
+    # where /tmp does not exist (e.g. Android/Termux without a /tmp mount).
+    db_path = str(tmp_path / "test_historical_mem.db")
     if os.path.exists(db_path):
         os.remove(db_path)
     mem = MarketMemory(db_path=db_path)
     yield mem
-    os.remove(db_path)
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
 
 class TestDeterministicSimilarity:

@@ -1,5 +1,6 @@
 """End-to-end v3 pipeline tests: decision engine across scenarios."""
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -242,9 +243,17 @@ def test_full_loop_recommendation_to_outcome(cfg, tmp_path):
         })
         if rec.decision == Decision.RECOMMENDATION:
             p = rec.plan
-            # synthetic premium path: rises to T1 within 3 bars after decision
-            bars = [PremiumBar("2026-09-29T10:35", p.entry, p.entry + 2, p.entry - 1, p.entry + 1),
-                    PremiumBar("2026-09-29T10:40", p.entry + 1, p.t1 + 3, p.entry, p.t1 + 1)]
+            # Synthetic premium path that rises to T1 shortly AFTER the decision.
+            # Timestamps are derived from the real decision_ts: the engine
+            # stamps it with wall-clock now_ist(), so hardcoded clock times
+            # (e.g. "10:35") can land BEFORE the decision and be correctly
+            # discarded by evaluate_outcome's no-look-ahead filter. Deriving
+            # them keeps the fixture honest without weakening that filter.
+            dts = datetime.fromisoformat(rec.decision_ts)
+            t1 = (dts + timedelta(minutes=5)).isoformat()
+            t2 = (dts + timedelta(minutes=10)).isoformat()
+            bars = [PremiumBar(t1, p.entry, p.entry + 2, p.entry - 1, p.entry + 1),
+                    PremiumBar(t2, p.entry + 1, p.t1 + 3, p.entry, p.t1 + 1)]
             res = evaluate_outcome(p.entry, p.stop_loss, p.t1, bars, rec.decision_ts)
             assert res["outcome"] == "WIN_T1"
             oid = db.insert_outcome({
@@ -262,3 +271,66 @@ def test_full_loop_recommendation_to_outcome(cfg, tmp_path):
             assert db.recent_recommendations()[0]["decision"] == "NO_TRADE"
     finally:
         db.close()
+
+
+# ------------------------------------------------- evaluate_outcome no-look-ahead guards
+# These pin the protections that a "fix" for the TIMEOUT failure must NOT weaken.
+ENTRY, SL, T1 = 100.0, 95.0, 107.0
+
+
+def _bar(iso, high, low):
+    return PremiumBar(iso, ENTRY, high, low, ENTRY)
+
+
+def test_bars_at_or_before_decision_are_rejected():
+    """A bar stamped exactly at the decision must NOT be consumed (no look-ahead)."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar("2026-09-29T12:00:00+05:30", T1 + 5, ENTRY)]  # T1 would hit
+    res = evaluate_outcome(ENTRY, SL, T1, bars, dts)
+    assert res["outcome"] == "TIMEOUT", res
+    assert res["bars_to_outcome"] == 0
+
+
+def test_pre_decision_bars_never_produce_a_win():
+    """Historical bars before the decision are ignored even if they 'hit' T1."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar("2026-09-29T10:35:00+05:30", T1 + 9, SL - 9)]
+    res = evaluate_outcome(ENTRY, SL, T1, bars, dts)
+    assert res["outcome"] == "TIMEOUT", res
+    assert res["mfe"] == 0.0 and res["mae"] == 0.0
+
+
+def test_first_bar_after_decision_can_win():
+    """A bar strictly after the decision is consumed and T1 resolves."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar("2026-09-29T12:05:00+05:30", T1 + 3, ENTRY)]
+    res = evaluate_outcome(ENTRY, SL, T1, bars, dts)
+    assert res["outcome"] == "WIN_T1", res
+    assert res["bars_to_outcome"] == 1
+
+
+def test_same_bar_t1_and_sl_is_conservative_loss():
+    """Ambiguous bar (both levels touched in one bar) counts as LOSS, never a win."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar("2026-09-29T12:05:00+05:30", T1 + 3, SL - 3)]
+    res = evaluate_outcome(ENTRY, SL, T1, bars, dts)
+    assert res["outcome"] == "LOSS", res
+    assert "ambiguity" in res["exit_reason"]
+
+
+def test_t1_touch_compares_inclusively():
+    """high exactly at T1 counts as reached (>= not >)."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar("2026-09-29T12:05:00+05:30", T1, ENTRY)]
+    assert evaluate_outcome(ENTRY, SL, T1, bars, dts)["outcome"] == "WIN_T1"
+
+
+def test_holding_window_limits_evaluated_bars():
+    """Bars beyond max_bars are never consumed."""
+    dts = "2026-09-29T12:00:00+05:30"
+    bars = [_bar(f"2026-09-29T12:{m:02d}:00+05:30", ENTRY, ENTRY)
+            for m in range(1, 10)]
+    bars.append(_bar("2026-09-29T13:00:00+05:30", T1 + 3, ENTRY))  # too late
+    res = evaluate_outcome(ENTRY, SL, T1, bars, dts, max_bars=3)
+    assert res["outcome"] == "TIMEOUT", res
+    assert res["bars_to_outcome"] == 3
