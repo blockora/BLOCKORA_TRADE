@@ -96,6 +96,36 @@ class DecisionValidator:
         #    HIGH_VOLATILITY me tighter 1:1.5 (config high_volatility_rules.min_risk_reward)
         #    FIX B: HIGH_VOLATILITY me T3 use karo (3×ATR / 1.5×ATR = 2.0) instead of T2 (1.33)
         bs = ctx.get("best_strike", {}) or {}
+        # 6a) Level SANITY before any ratio math.
+        # Live defect: a 2.10 premium produced SL -2.90. The R:R test below
+        # then saw risk = entry - sl = 5.0 and reward/risk = 2.8, so an
+        # impossible trade cleared the 2.0 minimum. Geometry is checked
+        # FIRST so no arithmetic can launder an invalid level into a pass.
+        try:
+            _e = float(bs.get("entry", 0) or 0)
+            _s = float(bs.get("stop_loss", 0) or 0)
+            _t1 = float(bs.get("target_1", 0) or 0)
+            _t2 = float(bs.get("target_2", 0) or 0)
+            _t3 = float(bs.get("target_3", 0) or 0)
+            if _e <= 0:
+                hard_fail.append("invalid_risk_levels")
+            elif _s <= 0:
+                hard_fail.append(f"invalid_risk_levels:sl_nonpositive_{_s}")
+            elif _s >= _e:
+                hard_fail.append("invalid_risk_levels:sl_not_below_entry")
+            else:
+                # Only the targets that are actually PRESENT are checked:
+                # an absent target is unknown, not invalid. T1 is required.
+                _tg = [t for t in (_t1, _t2, _t3) if t > 0]
+                if not _tg or _tg[0] <= _e:
+                    hard_fail.append("invalid_risk_levels:target_not_above_entry")
+                elif any(t <= _e for t in _tg):
+                    hard_fail.append("invalid_risk_levels:target_not_above_entry")
+                elif _tg != sorted(_tg):
+                    hard_fail.append("invalid_risk_levels:targets_unordered")
+        except (TypeError, ValueError):
+            hard_fail.append("invalid_risk_levels:parse_fail")
+
         try:
             entry = float(bs.get("entry", 0) or 0)
             sl = float(bs.get("stop_loss", 0) or 0)

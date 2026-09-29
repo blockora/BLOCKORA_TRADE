@@ -67,10 +67,22 @@ def _app(expiry="29SEP2026"):
     return app
 
 
-def _chain(iv=14.0, expiry="29SEP2026"):
+def _future_expiry(days: int = 3) -> str:
+    """A scrip-master expiry that is genuinely in the future.
+
+    A hardcoded date would make the test pass or fail depending on when it
+    runs: core.timeutil treats an elapsed expiry as unusable (correctly), so
+    a fixture pinned to a past session would silently stop attaching greeks.
+    """
+    from core.timeutil import now_ist
+    from datetime import timedelta
+    return (now_ist() + timedelta(days=days)).strftime("%d%b%Y")
+
+
+def _chain(iv=14.0, expiry=None):
     rec = lambda t, o: {"strike": 22650, "ltp": t, "iv": iv, "oi": 100,
                         "bid": t - 0.5, "ask": t + 0.5, "oi_source": "REAL"}
-    return {"expiry": expiry, "spot_price": 22650,
+    return {"expiry": expiry or _future_expiry(), "spot_price": 22650,
             "ce_data": {22650: rec(120.0, "CE")},
             "pe_data": {22650: rec(110.0, "PE")}}
 
@@ -101,6 +113,15 @@ def test_no_expiry_means_no_greeks():
     """Never guess time-to-expiry: without a real expiry, no greeks."""
     app = _app(expiry="")
     out = app._attach_greeks(_chain(14.0, expiry=""), 22650.0)
+
+
+def test_elapsed_expiry_means_no_greeks():
+    """A past session close is unusable -> no greeks, not a negative tenor."""
+    app = _app()
+    past = "01JAN2020"
+    out = app._attach_greeks(_chain(14.0, expiry=past), 22650.0)
+    assert "greeks" not in out["ce_data"][22650]
+    assert out["greeks_source"] == "UNAVAILABLE"
     assert "greeks" not in out["ce_data"][22650]
 
 

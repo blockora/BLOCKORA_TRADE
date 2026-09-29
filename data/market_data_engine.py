@@ -46,6 +46,10 @@ class MarketDataEngine:
         
         # Candle cache with TTL (for slow network resilience)
         self._last_good_candles = []  # Last successfully fetched candles
+        # Timestamp of the last real broker LTP. Kept so a cached fallback
+        # can report the TRUE age of the price it is reusing instead of
+        # stamping datetime.now() and looking live.
+        self._last_good_ts = ""
         self._candle_cache_ttl = {
             "5m": 120,     # 5m candles valid for 2 minutes
             "15m": 300,    # 15m candles valid for 5 minutes
@@ -305,8 +309,14 @@ class MarketDataEngine:
                 current_high = float(ltp_data["data"].get("high", current_ltp))
                 current_low = float(ltp_data["data"].get("low", current_ltp))
                 
+                _qts = datetime.now().isoformat()
                 self.live_data = {
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": _qts,
+                    # Explicit age tracking: the freshness guard and the
+                    # market snapshot read this rather than re-deriving "now"
+                    # and thereby declaring a reused price fresh.
+                    "quote_timestamp": _qts,
+                    "quote_source": "ANGEL_LTP",
                     "symbol": "NIFTY",
                     "ltp": current_ltp,
                     "open": float(ltp_data["data"].get("open", 0)),
@@ -330,6 +340,7 @@ class MarketDataEngine:
                     # Cache the updated candles
                     self._last_good_candles = candles_data
                 
+                self._last_good_ts = _qts
                 self._maybe_update_historical()
                 self.update_mtf_candles()
                 self.live_data["candles_15m"] = self.candles_15m
@@ -374,8 +385,18 @@ class MarketDataEngine:
                 pass
             # Return with cached candles (even if empty - safety)
             if self._last_good_candles:
+                # The LTP below is the PREVIOUS cycle's value. It must keep
+                # its original timestamp: stamping datetime.now() here is what
+                # made a frozen spot (22683.75 across 5 cycles) look like a
+                # live quote and slipped past the freshness guard.
+                _prev_ts = (self.live_data or {}).get("quote_timestamp") \
+                    or (self.live_data or {}).get("timestamp")
+                if not _prev_ts:
+                    _prev_ts = (self._last_good_ts or "")
                 self.live_data = {
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": _prev_ts,
+                    "quote_timestamp": _prev_ts,
+                    "quote_source": "CACHED_PREVIOUS_CYCLE",
                     "symbol": "NIFTY",
                     "ltp": self.live_data.get("ltp", 0) if self.live_data else 0,
                     "open": self.live_data.get("open", 0) if self.live_data else 0,

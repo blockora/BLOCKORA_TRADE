@@ -20,6 +20,8 @@ from engines.confidence.confidence_engine import ConfidenceEngine
 from engines.risk.risk_engine import RiskEngine
 from engines.ranking.strike_ranking_engine import StrikeRankingEngine
 from engines.ranking.factors import FACTOR_SPECS, MAX_TOTAL_SCORE
+from core.timeutil import now_ist, years_to_expiry, age_seconds, humanize_age, parse_timestamp
+from core.market_snapshot import build_market_snapshot
 from engines.learning.outcome_tracker import OutcomeTracker, SelfLearner
 from data.data_freshness_guard import DataFreshnessGuard
 from engines.liquidity.liquidity_engine import LiquidityEngine
@@ -194,59 +196,110 @@ class BlockoraTrade:
         return market_open <= now.time() <= market_close
 
     def _attach_greeks(self, chain, spot):
-        """Attach Black-Scholes greeks to every chain record that has a REAL IV.
+        """Attach Black-Scholes greeks to every contract with a REAL, CURRENT IV.
 
-        Angel One SmartAPI does not supply option greeks, and the NSE chain has
-        none either, so greeks here are DERIVED (calculated), never broker-sourced.
-        They are computed only from a real implied volatility; if the IV is
-        missing or non-positive the record is left without greeks and the
-        dashboard reports it as unavailable. No greeks are ever invented.
+        Angel One supplies no greeks and the NSE chain supplies none either,
+        so these are DERIVED, never broker-sourced, and are labelled
+        DERIVED_BS wherever they are shown.
 
-        Uses the broker-detected expiry (not a guessed weekday) and the IST
-        market close, matching the ranking engine's time-to-expiry logic.
+        Timezone correctness
+        --------------------
+        The previous version parsed the expiry with datetime.strptime, which
+        yields a NAIVE datetime, and subtracted it from
+        ConfigManager.now(), which yields an AWARE one. That raised
+
+            TypeError: can't subtract offset-naive and offset-aware datetimes
+
+        and the cycle swallowed the exception, so greeks were missing on
+        every live run. All datetime handling now goes through
+        core.timeutil, which is aware-IST throughout and anchors the expiry
+        to the IST 15:30 session close.
+
+        Honest unavailability
+        ---------------------
+        A contract with no real IV, no real expiry, or no spot gets NO
+        greeks key and an explicit IV source of UNAVAILABLE. Nothing is
+        estimated, and no greeks are ever invented.
         """
         from engines.ranking.greeks import black_scholes
 
         if not isinstance(chain, dict) or not spot or spot <= 0:
             return chain
-        expiry = chain.get("expiry") or getattr(getattr(self, "market_engine", None),
-                                                "detected_expiry", "") or ""
-        try:
-            exp_dt = datetime.strptime(expiry, "%d%b%Y")
-        except (TypeError, ValueError):
-            return chain  # no real expiry -> do not guess DTE -> no greeks
 
-        now = self.config.now() if self.config else datetime.now()
-        close_s = self.config.get("market_hours.close", "15:30") if self.config else "15:30"
-        try:
-            close_t = datetime.strptime(close_s, "%H:%M").time()
-        except (TypeError, ValueError):
-            close_t = dtime(15, 30)
-        if now.date() == exp_dt.date():
-            market_close = datetime.combine(now.date(), close_t)
-            years = max(0.0, (market_close - now).total_seconds() / 3600.0) / 8760.0
-        else:
-            years = max(0.0, (exp_dt - now).days) / 365.0
-        if years <= 0:
-            return chain  # expired / zero time value -> no greeks
+        expiry = (chain.get("expiry")
+                  or getattr(getattr(self, "market_engine", None),
+                             "detected_expiry", "") or "")
+        now = now_ist()
+        years = years_to_expiry(expiry, now)
+        if years is None or years <= 0:
+            # Unknown or already-past expiry: never guess a time to expiry.
+            chain["greeks_source"] = "UNAVAILABLE"
+            chain["greeks_note"] = ("No usable expiry (unknown or elapsed) - "
+                                    "greeks not derived.")
+            return chain
 
-        days = max(1, int(round(years * 365)))
+        # black_scholes wants whole days; floor at 1 so expiry-day greeks
+        # stay finite instead of dividing by sqrt(0).
+        days = max(1, int(years * 365))
         attached = 0
-        for side in ("ce_data", "pe_data"):
-            opt_type = "CE" if side == "ce_data" else "PE"
+        for side, opt_type in (("ce_data", "CE"), ("pe_data", "PE")):
             for rec in (chain.get(side) or {}).values():
                 if not isinstance(rec, dict):
                     continue
-                g = black_scholes(spot, rec.get("strike"), days, rec.get("iv", 0), opt_type)
+                self._stamp_contract_iv_source(rec, expiry)
+                g = black_scholes(spot, rec.get("strike"), days,
+                                  rec.get("iv", 0), opt_type)
                 if g:
                     rec["greeks"] = g
                     rec["greeks_source"] = "DERIVED_BS"
                     attached += 1
+
         if attached:
             chain["greeks_source"] = "DERIVED_BS"
-            chain["greeks_note"] = ("Calculated via Black-Scholes from real NSE IV; "
-                                    "Angel One does not provide greeks.")
+            chain["greeks_note"] = ("Calculated via Black-Scholes from the "
+                                    "contract's real NSE IV; Angel One does "
+                                    "not provide greeks.")
+        else:
+            chain["greeks_source"] = "UNAVAILABLE"
+            chain["greeks_note"] = ("No contract carried a usable IV - "
+                                    "greeks not derived.")
         return chain
+
+    def _stamp_contract_iv_source(self, rec, expiry):
+        """Label this contract's IV honestly.
+
+        The chain builder tags IV as REAL whenever a number > 0 was found,
+        which is not the same as saying where it came from or whether it is
+        the value for THIS contract. Here each field gets an explicit source,
+        and a contract with no IV is marked UNAVAILABLE rather than silently
+        inheriting a chain-level label.
+        """
+        try:
+            iv = float(rec.get("iv", 0) or 0)
+        except (TypeError, ValueError):
+            iv = 0.0
+        if iv > 0:
+            rec["iv_source"] = "NSE_OPTION_CHAIN"   # real NSE IV, this strike
+        else:
+            rec["iv"] = 0.0
+            rec["iv_source"] = "UNAVAILABLE"
+            rec.pop("greeks", None)
+            rec["greeks_source"] = "UNAVAILABLE"
+        # Premium provenance, per contract.
+        try:
+            if float(rec.get("ltp", 0) or 0) > 0:
+                rec.setdefault("premium_source", "ANGEL_LIVE")
+            else:
+                rec["premium_source"] = "UNAVAILABLE"
+        except (TypeError, ValueError):
+            rec["premium_source"] = "UNAVAILABLE"
+        if not rec.get("expiry") and expiry:
+            rec["expiry"] = expiry
+        if rec.get("expiry"):
+            rec["expiry_source"] = "SCRIP_MASTER"
+        else:
+            rec["expiry_source"] = "UNAVAILABLE"
+        return rec
 
     def _build_angel_chain(self, market_data):
         """Angel One live data se NSE-format option chain banata hai"""
@@ -637,7 +690,40 @@ class BlockoraTrade:
             except Exception as e:
                 self.logger.warning(f"Greeks attach skipped: {e}")
 
-            ranked_strikes = self.ranking_engine.rank(analysis_results, confidence)
+            # 📸 ONE AUTHORITATIVE SNAPSHOT per cycle.
+            # Built after analysis so it can carry the indicator values, and
+            # consumed by ranking, the dashboard, the invalidation level and
+            # the persisted diagnostics. This is what stops spot/OHLC/RSI/ATR
+            # coming from different instants in the same printed block.
+            market_snapshot = build_market_snapshot(
+                market_data, option_chain, analysis_results,
+                analysis_results.get("regime", {}) or {}, vix=vix, now=now)
+
+            # Spot must be provably current, and it must not be a reused
+            # value. A cached underlying is rejected here rather than being
+            # ranked against.
+            if not market_snapshot.is_spot_fresh():
+                _reasons = market_snapshot.staleness_reasons
+                self.logger.warning(
+                    f"NO_TRADE spot_stale: {_reasons} "
+                    f"source={market_snapshot.spot_source} "
+                    f"age={market_snapshot.spot_age_display()}")
+                print(f"\n{'='*60}")
+                print(f"  🛡️ CYCLE #{self.cycle_count} | NO TRADE (stale market data)")
+                print(f"  📊 Spot: {market_snapshot.spot} ({market_snapshot.spot_source})")
+                print(f"  ⏱️  Quote age: {market_snapshot.spot_age_display()}")
+                print(f"  🛑 Reason: {', '.join(_reasons)}")
+                print(f"{'='*60}")
+                return None
+
+            # Ranking reads spot/ATR/indicators from the SAME snapshot.
+            analysis_results["market_snapshot"] = market_snapshot
+            market_data_for_rank = dict(market_data)
+            market_data_for_rank["atr"] = market_snapshot.atr
+            market_data_for_rank["snapshot"] = market_snapshot
+
+            ranked_strikes = self.ranking_engine.rank(
+                analysis_results, confidence, market_data_for_rank)
             risk_assessment = self.risk_engine.evaluate(analysis_results, confidence)
 
             # 🎯 v2.1+ PERFECT STRIKE: top-3 + best-strike + score-margin populate
@@ -1265,22 +1351,55 @@ class BlockoraTrade:
         mtf = analysis_results.get("multi_timeframe", {})
         # Values below are produced by real engines that the dashboard was
         # dropping. Anything absent is shown as Unavailable, never defaulted.
+        # Prefer the cycle's authoritative snapshot: it is the SAME object
+        # ranking used, so spot/OHLC/indicators can no longer disagree.
+        _snap = analysis_results.get("market_snapshot")
         _md = analysis_results.get("market_data", {}) or {}
         _oi = analysis_results.get("oi_analysis", {}) or {}
         _sr = analysis_results.get("support_resistance", {}) or {}
         _reg = analysis_results.get("regime", {}) or {}
-        _atr = indicators.get("atr", "N/A")
+        if _snap is not None:
+            _tf = _snap.indicator_timeframe
+            _atr = _snap.atr if _snap.atr is not None else "Unavailable"
+            _rsi = _snap.rsi if _snap.rsi is not None else "Unavailable"
+            _adx = _snap.adx if _snap.adx is not None else "Unavailable"
+            _vw_disp = _snap.vwap if _snap.vwap is not None else "Unavailable"
+            _sup_d, _res_d = _snap.support, _snap.resistance
+            _bias_d = _snap.bias
+            _spot_d = _snap.spot
+            _age = f"{_snap.spot_age_display()} | {_snap.data_status}"
+            _chain_age = _snap.chain_age_display()
+        else:
+            _tf = "5m"
+            _atr = indicators.get("atr", "N/A")
+            _rsi = indicators.get("rsi", "N/A")
+            _adx = indicators.get("adx", "N/A")
+            _vw_disp = ctx.get("vwap", "N/A")
+            _sup_d = _sr.get("support", "N/A")
+            _res_d = _sr.get("resistance", "N/A")
+            _bias_d = analysis_results.get("trend", {}).get("direction", "N/A")
+            _spot_d = spot
+            _age = "Unavailable"
+            _chain_age = "Unavailable"
         _mp = opt_chain.get("max_pain", "N/A")
-        _ohlc = (f"O {_md.get('open','—')} H {_md.get('high','—')} "
-                 f"L {_md.get('low','—')} C {_md.get('close','—')}")
+        _ohlc = (f"O {_md.get('open','Unavailable')} H {_md.get('high','Unavailable')} "
+                 f"L {_md.get('low','Unavailable')} C {_md.get('close','Unavailable')}")
         print(f"  📈 MARKET SNAPSHOT:")
-        print(f"     Spot: {spot} | OHLC: {_ohlc} | Source: {_md.get('data_source','N/A')}")
-        print(f"     RSI: {rsi_val} | ADX: {adx_val} | ATR: {_atr} | VWAP: {vwap_val}")
+        print(f"     Spot: {_spot_d} | OHLC: {_ohlc} | Source: {_md.get('data_source','N/A')}")
+        print(f"     Quote age: {_age} | Chain age: {_chain_age}")
+        # Timeframe is named explicitly. The live run showed "Ranking ATR 12.5"
+        # against "Snapshot ATR 21.7" because the ranking value was a hardcoded
+        # default, not a second timeframe.
+        print(f"     RSI({_tf}): {_rsi} | ADX({_tf}): {_adx} | ATR({_tf}): {_atr} | VWAP: {_vw_disp}")
         print(f"     PCR: {pcr_val} ({opt_chain.get('pcr_source','N/A')}) | Max Pain: {_mp} ({opt_chain.get('max_pain_source','N/A')})")
-        print(f"     Support: {_sr.get('support','N/A')} | Resistance: {_sr.get('resistance','N/A')} | Bias: {analysis_results.get('trend', {}).get('direction','N/A')}")
+        print(f"     Support: {_sup_d} | Resistance: {_res_d} | Bias: {_bias_d}")
         print(f"     Regime: {_reg.get('type','N/A')}/{_reg.get('classification','N/A')} | VIX: {rec.get('vix','N/A')}")
         print(f"     MTF: 5m {mtf.get('t5','N/A')} | 15m {mtf.get('t15','N/A')} | 1h {mtf.get('t1h','N/A')}")
         print(f"     Fear & Greed: {ctx.get('fear_greed', 'NEUTRAL')} | Chain: {opt_chain.get('source','N/A')} | Expiry: {opt_chain.get('expiry','N/A')}")
+        # Bias vs MTF are different measurements, deliberately not forced to
+        # agree: Bias is the composite trade_context direction, while each MTF
+        # leg is that single timeframe's own read of the same snapshot.
+        print(f"     Note: Bias is the composite direction; MTF legs are per-timeframe reads of the same snapshot.")
         
         # --- SELECTED CONTRACT DETAIL (real chain fields only) ---
         _cd = dict(opt_chain.get("pe_data" if _best_type == "PE" else "ce_data", {}).get(_best_strike, {}) or {})
@@ -1328,7 +1447,8 @@ class BlockoraTrade:
             print(f"     Delta: {_g.get('delta','—')} | Gamma: {_g.get('gamma','—')} | Theta: {_g.get('theta','—')} | Vega: {_g.get('vega','—')} [{_cd.get('greeks_source','DERIVED_BS')}]")
         else:
             print(f"     Delta/Gamma/Theta/Vega: Unavailable (no real IV for this contract)")
-        print(f"     Expiry: {_cd.get('expiry') or opt_chain.get('expiry','Unavailable')} | LTP source: {_cd.get('oi_source','n/a')}/IV source: {_cd.get('iv_source','UNKNOWN')}")
+        print(f"     Expiry: {_cd.get('expiry') or opt_chain.get('expiry','Unavailable')} [{_cd.get('expiry_source','UNAVAILABLE')}]")
+        print(f"     Provenance — LTP: {_cd.get('premium_source','UNAVAILABLE')} | Bid/Ask: {_cd.get('bid_source','UNAVAILABLE')}/{_cd.get('ask_source','UNAVAILABLE')} | OI: {_cd.get('oi_source','UNAVAILABLE')} | Volume: {_cd.get('volume_source','UNAVAILABLE')} | IV: {_cd.get('iv_source','UNAVAILABLE')} | Greeks: {_cd.get('greeks_source','UNAVAILABLE')}")
         print(f"{'─'*70}")
         # --- TOP 3 STRIKES COMPARISON TABLE ---
         _ce_ranks = ranked_strikes.get("ce_rankings", [])[:3]

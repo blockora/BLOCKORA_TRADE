@@ -206,24 +206,86 @@ def calculate_entry_price(bid, ask):
     return round(entry / 0.05) * 0.05
 
 
+#: Minimum premium (in rupees) for which the fixed 5-point scalp stop is
+#: meaningful. Below this a 5-point stop is larger than the option itself.
+MIN_FIXED_STOP_PREMIUM = 10.0
+
+#: Floor for the proportional stop, as a fraction of entry. A stop must
+#: never consume most of the premium or the risk/reward is not a trade.
+MIN_PROPORTIONAL_STOP_FRACTION = 0.15
+
+#: Absolute minimum rupee distance, so a ₹2 premium does not get a ₹0.05 stop.
+MIN_STOP_DISTANCE = 0.05
+
+
 def calculate_stop_loss(entry, atr, direction):
+    """Stop loss for a long option premium.
+
+    Live defect this fixes: the model was a flat `entry - 5`, so an expiry-day
+    option quoted at 2.10 produced SL = -2.90 and 1.50 produced SL = -3.50.
+    A negative stop is not a stop: the validator's own R:R test then computed
+    risk = entry - sl = 5.0 and reward/risk = 2.8, so a mathematically
+    impossible trade passed the 2.0 minimum and reached the screen.
+
+    The fixed 5-point scalp stop is retained for premiums where it makes
+    sense, and scaled proportionally below that so a cheap option gets a
+    stop that is actually smaller than the premium.
+
+    Returns a value strictly below entry and strictly above 0. Callers must
+    still treat a non-positive result as invalid rather than display it.
     """
-    7-POINT SCALPING MODE: fixed 5-point tight stop.
-    SL: entry - 5 (fixed points, no ATR dependency)
-    """
-    return entry - 5
+    try:
+        entry = float(entry)
+    except (TypeError, ValueError):
+        return 0.0
+    if entry <= 0:
+        return 0.0
+
+    if entry >= MIN_FIXED_STOP_PREMIUM:
+        sl = entry - 5.0
+    else:
+        # Cheap premium: a fixed point stop is not expressible. Use a
+        # proportional stop, floored so it stays a real distance.
+        distance = entry * MIN_PROPORTIONAL_STOP_FRACTION
+        sl = entry - max(distance, MIN_STOP_DISTANCE)
+
+    if sl >= entry:
+        return 0.0
+    return round(max(0.0, sl), 2)
 
 
 def calculate_targets(entry, atr, direction):
+    """Targets for a long option premium.
+
+    T1: entry + 7 | T2: entry + 10 | T3: entry + 14, as before. For a cheap
+    premium a flat +7 overshoots the option's whole value, so below
+    MIN_FIXED_STOP_PREMIUM the same reward multiple is scaled down
+    proportionally instead.
+
+    Every target is guaranteed STRICTLY above entry. A target at or below
+    entry is not a target, and the validator rejects it.
     """
-    7-POINT SCALPING MODE: fixed point targets.
-    T1: entry + 7 | T2: entry + 10 | T3: entry + 14
-    ATR parameter kept for signature compatibility - ignored.
-    """
-    t1 = entry + 7
-    t2 = entry + 10
-    t3 = entry + 14
-    return round(t1, 2), round(t2, 2), round(t3, 2)
+    try:
+        entry = float(entry)
+    except (TypeError, ValueError):
+        return (0.0, 0.0, 0.0)
+    if entry <= 0:
+        return (0.0, 0.0, 0.0)
+
+    if entry >= MIN_FIXED_STOP_PREMIUM:
+        offsets = (7.0, 10.0, 14.0)
+    else:
+        scale = entry / MIN_FIXED_STOP_PREMIUM
+        offsets = (7.0 * scale, 10.0 * scale, 14.0 * scale)
+
+    out = []
+    for off in offsets:
+        value = round(entry + max(off, MIN_STOP_DISTANCE), 2)
+        # never at or below entry
+        if value <= entry:
+            value = round(entry + MIN_STOP_DISTANCE, 2)
+        out.append(value)
+    return tuple(out)
 
 
 def calculate_invalidation(spot, vwap, atr, direction):

@@ -49,11 +49,17 @@ class StrikeRankingEngine:
         self.logger = logger
         self.historical_volumes = {}  # (strike, type) -> [last 20 volumes]
 
-    def rank(self, analysis_results, confidence=None):
-        """Wrapper for backward compatibility - calls rank_strikes()"""
-        return self.rank_strikes(analysis_results)
+    def rank(self, analysis_results, confidence=None, market_data=None):
+        """Wrapper for backward compatibility - calls rank_strikes()
 
-    def rank_strikes(self, analysis_results):
+        `market_data` is optional. When given, it is the caller's
+        authoritative snapshot dict (core.market_snapshot) and supplies
+        spot/ATR so ranking and the dashboard cannot read different values.
+        Existing two-argument callers keep working.
+        """
+        return self.rank_strikes(analysis_results, market_data=market_data)
+
+    def rank_strikes(self, analysis_results, market_data=None):
         """
         Main method - returns best CE and PE strikes.
         CONTRACT: always returns the ranked-dict shape (never None).
@@ -77,7 +83,11 @@ class StrikeRankingEngine:
 
         self.logger.info("=== Adaptive Strike Ranking Started ===")
 
-        market_data = analysis_results.get("market_data", {}) or {}
+        # Prefer the caller-supplied authoritative snapshot over whatever
+        # analysis_results carries, so one cycle cannot rank against two
+        # different spot/ATR readings.
+        market_data = market_data if market_data is not None \
+            else (analysis_results.get("market_data", {}) or {})
         option_chain = analysis_results.get("option_chain", {}) or {}
         spot = market_data.get("ltp", 0)
 
@@ -85,7 +95,14 @@ class StrikeRankingEngine:
             self.logger.warning("Spot price 0, cannot rank strikes")
             return dict(empty)
 
-        atr = market_data.get("atr", 12.5)
+        # ATR now comes from the cycle's authoritative market snapshot.
+        # It used to fall back to a hardcoded constant because nothing ever
+        # wrote an "atr" key into market_data, so that constant was used on
+        # every cycle while the dashboard printed the real 5-minute ATR from
+        # the same run. One field name, two different meanings.
+        # If the snapshot genuinely has no ATR we pass 0.0, which shrinks the
+        # adaptive strike range rather than pretending to know volatility.
+        atr = float(market_data.get("atr") or 0.0)
         vix = market_data.get("vix", 15)
 
         ctx = analysis_results.get("trade_context", {}) or {}
