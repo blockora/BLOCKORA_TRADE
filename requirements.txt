@@ -40,10 +40,18 @@ logzero
 pytest          # documented test runner (README: python3 -m pytest tests/)
 
 # --- Optional runtime -------------------------------------------------------
-# psutil — core/system_health.py imports it in a try/except and degrades
-#          gracefully to "metrics unavailable" when absent. Declared so the
-#          health module has a real chance to work; the app runs fine without it.
-psutil
+# psutil — NOT a dependency, on purpose.
+#   psutil upstream refuses to install on Android ("platform android is not
+#   supported"), so a mandatory psutil made `pip install -r requirements.txt`
+#   fail outright on Termux.
+#   core/system_health.py no longer needs it: system health is read from
+#   /proc/meminfo, /proc/stat, /proc/uptime, os.statvfs and os.getloadavg,
+#   all of which work on Android. It is used opportunistically when present
+#   (desktop gets a first-call CPU% and a couple of extra fields), and the
+#   module imports and runs identically without it.
+#   Desktop users who want the extra fields can install it themselves:
+#       pip install psutil        # desktop / Linux only, never Android
+
 
 # --- Deliberately NOT dependencies -----------------------------------------
 # pandas  — used only by engines/ranking/greeks.py::add_greeks_to_df(), which is

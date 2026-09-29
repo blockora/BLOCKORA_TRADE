@@ -365,8 +365,14 @@ def test_requirements_declare_smartapi_transitive_imports():
     req = (Path(__file__).resolve().parent.parent / "requirements.txt").read_text()
     declared = {line.split("#")[0].strip().split("==")[0].lower()
                 for line in req.splitlines() if line.strip() and not line.startswith("#")}
-    for needed in ("logzero", "pytest", "psutil", "smartapi-python"):
+    for needed in ("logzero", "pytest", "smartapi-python"):
         assert needed in declared, f"{needed} missing from requirements.txt"
+    # psutil is deliberately NOT required. Upstream psutil refuses to install
+    # on Android ("platform android is not supported"), so a mandatory psutil
+    # broke `pip install -r requirements.txt` on Termux. system_health now
+    # reads /proc and os.* instead and treats psutil as a desktop-only extra.
+    assert "psutil" not in declared, (
+        "psutil must stay out of requirements.txt or Android installs fail")
 
 
 # --------------------------------------------------------------------------
