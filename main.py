@@ -414,11 +414,18 @@ class BlockoraTrade:
             return None, "UNKNOWN"
 
     def _top3_score_margin(self, ce_ranks, pe_ranks, direction):
-        """Score margin: top-1 score minus top-2 score for the active side (0 if tied/none)."""
+        """Score margin: top-1 score minus top-2 score for the active side (0 if tied/none).
+
+        Ranking candidates carry 'score' (alias of legacy 'total_score'); accept both
+        keys defensively for any caller-built ranking dicts."""
         side = pe_ranks if direction == "BEARISH" else ce_ranks
         if len(side) < 2:
             return 0
-        return round(float(side[0].get("score", 0)) - float(side[1].get("score", 0)), 2)
+
+        def _s(d):
+            return float(d.get("score", d.get("total_score", 0)) or 0)
+
+        return round(_s(side[0]) - _s(side[1]), 2)
 
     def _fetch_graduation_ltp(self, recommendation):
         """FIX #6: Graduation moment par CURRENT real option LTP fetch"""
@@ -553,6 +560,12 @@ class BlockoraTrade:
             # 🌊 MARKET REGIME: detect trending/sideways/volatility
             regime = self.regime_engine.detect(market_data, analysis_results)
             analysis_results["regime"] = regime
+
+            # 📅 EXPIRY: broker scrip master auto-detect se single source of truth
+            _expiry = getattr(getattr(self, "market_engine", None), "detected_expiry", "") or ""
+            if _expiry:
+                analysis_results.setdefault("trade_context", {})["expiry_date"] = _expiry
+                option_chain.setdefault("expiry", _expiry)
 
             ranked_strikes = self.ranking_engine.rank(analysis_results, confidence)
             risk_assessment = self.risk_engine.evaluate(analysis_results, confidence)
@@ -794,6 +807,8 @@ class BlockoraTrade:
                 except Exception:
                     pass
 
+            recommendation["date"] = now.strftime("%Y-%m-%d")
+            recommendation["time"] = now.strftime("%H:%M:%S")
             self.db.store_decision(recommendation)
 
             # 🔥 SIGNAL LOCK + FIX #8: Blocked WATCHLIST notify (owner only, no VIP spam)
@@ -835,7 +850,21 @@ class BlockoraTrade:
             }
 
         except Exception as e:
-            self.logger.error(f"Analysis cycle error: {str(e)}")
+            # Structured failure observability: component/stage + full traceback.
+            # No credentials/tokens are ever included — only type/message/location.
+            import traceback as _tb
+            import re as _re
+            _frames = _tb.extract_tb(sys.exc_info()[2])
+            _comp, _stage = "unknown", "unknown"
+            if _frames:
+                _last = _frames[-1]
+                _stage = f"{_last.filename.split('/')[-1]}:{_last.lineno} in {_last.name}"
+                _m = _re.search(r"(engines/[a-z_]+/[a-z_]+\.py|data/[a-z_]+\.py)", _last.filename)
+                _comp = _m.group(1) if _m else _last.filename.split("/")[-1]
+            self.logger.error(
+                f"Analysis cycle failed component={_comp} stage={_stage} "
+                f"reason={type(e).__name__}: {e} data_status=degraded")
+            self.logger.error("Analysis cycle traceback:\n" + _tb.format_exc())
             return None
 
     def run(self):
@@ -879,7 +908,7 @@ class BlockoraTrade:
                         # Get live LTP from existing option chain (no new API)
                         live_ltp = None
                         try:
-                            oc = self.option_engine.get_option_chain(market_data)
+                            oc = self.option_engine.get_option_chain({"ltp": 0})
                             if oc and opt_type == "CE" and strike in oc.get("ce_data", {}):
                                 live_ltp = float(oc["ce_data"][strike].get("ltp", 0) or 0)
                             elif oc and opt_type == "PE" and strike in oc.get("pe_data", {}):
@@ -983,9 +1012,9 @@ class BlockoraTrade:
         
         _best_strike = _best.get("strike", "N/A")
         _best_type = _best.get("option_type", "PE" if direction == "BEARISH" else "CE")
-        _final_score = _best.get("score", "N/A")
-        _brain_conf = _best.get("brain_confidence", "N/A")
-        _engine_score = _best.get("engine_score", "N/A")
+        _final_score = _best.get("score", _best.get("total_score", "N/A"))
+        _brain_conf = _best.get("brain_confidence", _final_score if isinstance(_final_score, (int, float)) else 0)
+        _engine_score = _best.get("engine_score", _final_score if isinstance(_final_score, (int, float)) else 0)
         
         # Extract chain data for best strike
         opt_chain = analysis_results.get("option_chain", {})
@@ -1098,7 +1127,10 @@ class BlockoraTrade:
         print(f"  🎯 BEST PICK: NIFTY {_best_strike} {_best_type}")
         print(f"  ⚡ DECISION: {action} | {grade} | {reason}")
         print(f"  📊 Spot: {spot} | Time: {rec.get('time', time.strftime('%H:%M:%S'))}")
-        print(f"  📈 Final Score: {_final_score}/100 | Brain: {_brain_conf:.1f}% | Engine: {_engine_score}/100")
+        _brain_disp = f"{_brain_conf:.1f}" if isinstance(_brain_conf, (int, float)) else str(_brain_conf)
+        _engine_disp = f"{_engine_score}" if isinstance(_engine_score, (int, float)) else str(_engine_score)
+        _final_disp = f"{_final_score}" if isinstance(_final_score, (int, float)) else str(_final_score)
+        print(f"  📈 Final Score: {_final_disp}/100 | Brain: {_brain_disp}% | Engine: {_engine_disp}/100")
         print(f"{'─'*70}")
         print(f"  💰 Entry: ₹{entry:.2f} | 🛑 SL: ₹{sl:.2f}")
         print(f"  🎯 T1: ₹{t1:.2f} ({t1_p}% probability) | Book 50%")

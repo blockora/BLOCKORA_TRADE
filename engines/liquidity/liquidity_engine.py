@@ -17,14 +17,34 @@ class LiquidityEngine:
         if not option_chain:
             return option_chain, {"removed": 0, "kept": 0}
 
+        if not isinstance(option_chain, dict):
+            # Malformed chain: nothing to filter. Fail loud, contract honest —
+            # stats must never be reported as (0,0) for data we never saw.
+            if self.logger:
+                self.logger.warning(
+                    f"Liquidity: chain is {type(option_chain).__name__}, expected dict "
+                    f"-> passing through unfiltered")
+            return option_chain, {"removed": 0, "kept": -1}
+
         import copy
         chain = copy.deepcopy(option_chain)
         removed = 0
         kept = 0
+        malformed = False
 
         for side in ("ce_data", "pe_data"):
             opt_type = "CE" if side == "ce_data" else "PE"
+            # Raw value, no `or {}` coercion: a side explicitly set to None is
+            # MALFORMED DATA, not an empty dict, and must surface as kept=-1.
             original = chain.get(side, {})
+            if not isinstance(original, dict):
+                # Malformed side (e.g. None) — reject the side explicitly rather
+                # than crashing on .items(); consumer sees kept<0 = data-quality issue.
+                if self.logger:
+                    self.logger.warning(f"Liquidity: {side} is {type(original).__name__}, expected dict")
+                chain[side] = {}
+                malformed = True
+                continue
             filtered = {}
             for strike, rec in original.items():
                 ok, reason = self._check_strike(strike, rec, opt_type)
@@ -34,6 +54,9 @@ class LiquidityEngine:
                 else:
                     removed += 1
             chain[side] = filtered
+
+        if malformed:
+            kept = -1  # NEGATIVE kept = malformed data quality flag for the validator
 
         stats = {"removed": removed, "kept": kept}
         if removed > 0 and self.logger:

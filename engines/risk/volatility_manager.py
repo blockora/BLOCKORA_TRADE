@@ -179,7 +179,18 @@ class VolatilityManager:
         try:
             max_min = self._cfg_int("risk.high_volatility_rules.max_holding_minutes", 30)
             bs = ctx.get("best_strike", {}) or {}
-            hold = float(bs.get("holding_time", 0) or 0)
+            raw = bs.get("holding_time", 0)
+            # holding_time may be numeric OR a display string like "10-25 Minutes".
+            # (pre-fix float("10-25 Minutes") always raised -> rule always rejected)
+            if isinstance(raw, str):
+                digits = ""
+                for ch in raw:
+                    if ch.isdigit() or ch == ".":
+                        digits += ch
+                    elif digits:
+                        break
+                raw = digits if digits else 0
+            hold = float(raw or 0)
             if hold <= 0:
                 return True, "no_holding_time"
             if hold > max_min:

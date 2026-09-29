@@ -156,6 +156,8 @@ class MasterDecisionEngine:
         oi_ok = 0
         ch_ok = 0
         for rec in list(ce.values()) + list(pe.values()):
+            if not isinstance(rec, dict):
+                continue  # malformed record = rejected data point, never a crash
             if float(rec.get("oi", 0) or 0) > 0:
                 oi_ok += 1
             if rec.get("change_oi_source", "UNKNOWN") in ("REAL", "ZERO", "CALCULATED"):
@@ -208,10 +210,13 @@ class MasterDecisionEngine:
 
         # Real NSE OI Logic (Jo pehle se hai)
         pcr = option_chain.get("pcr", 1.0)
-        ce = option_chain.get("ce_data", {})
-        pe = option_chain.get("pe_data", {})
-        ce_chg = sum(d.get("change_oi", 0) for d in ce.values())
-        pe_chg = sum(d.get("change_oi", 0) for d in pe.values())
+        if pcr is None:
+            pcr = 1.0
+        ce = option_chain.get("ce_data", {}) or {}
+        pe = option_chain.get("pe_data", {}) or {}
+        # Malformed records (None / non-dict) = rejected data points, never a crash:
+        ce_chg = sum(float(d.get("change_oi", 0) or 0) for d in ce.values() if isinstance(d, dict))
+        pe_chg = sum(float(d.get("change_oi", 0) or 0) for d in pe.values() if isinstance(d, dict))
 
         score, bias, signals = 50, "NEUTRAL", []
         if pcr > 1.2: score += 10; bias = "BULLISH"; signals.append("PCR High")

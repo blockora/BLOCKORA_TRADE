@@ -55,6 +55,9 @@ class MarketDataEngine:
         # Freshness flag for DataFreshnessGuard
         self._last_get_live_fresh = False
 
+        # Auto-detected expiry (scrip-master source of truth; "" until known)
+        self.detected_expiry = ""
+
         # Candle cache timestamp tracking
         self._candle_cache_ttl_last = 0
 
@@ -525,12 +528,14 @@ class MarketDataEngine:
                         if future_exps:
                             future_exps.sort()
                             curr_exp = future_exps[0][1]  # Earliest future expiry
+                            self.detected_expiry = curr_exp  # single source of truth for cycle metadata
                             self.logger.info(f"Auto-detected expiry from file: {curr_exp} (available: {[e[1] for e in future_exps[:3]]})")
                         else:
                             # Fallback to calendar calculation (existing logic)
                             exp_day = self.config.get_int("analysis.expiry_weekday", 1)
                             exp = datetime.now().date() + timedelta(days=((exp_day - datetime.now().weekday()) % 7))
                             curr_exp = exp.strftime("%d%b%Y").upper()
+                            self.detected_expiry = curr_exp
                         
                         tok = {}
                         for it in master:
