@@ -122,7 +122,14 @@ def test_check_survives_every_os_source_failing(monkeypatch):
     monkeypatch.setattr(sh, "_disk_percent", lambda p="/": None)
     monkeypatch.setattr(sh, "_uptime_seconds", lambda: None)
     monkeypatch.setattr(sh, "_read_cpu_jiffies", lambda: None)
-    monkeypatch.setattr(sh.os, "getloadavg", lambda: (_ for _ in ()).throw(OSError()))
+    # raising=False: os.getloadavg does not exist at all on Android/Termux, so
+    # a strict setattr would fail there for a reason unrelated to health.
+    # The production code already guards with hasattr(), and this patch makes
+    # the attribute present-but-failing on either platform so the same branch
+    # is exercised everywhere.
+    monkeypatch.setattr(sh.os, "getloadavg",
+                        lambda: (_ for _ in ()).throw(OSError()),
+                        raising=False)
 
     h = SystemHealth()
     result = h.check()
@@ -144,6 +151,23 @@ def test_check_result_is_always_json_serialisable(monkeypatch):
 
 
 # --------------------------- 3. unavailable != 0 (the old fabricated zero)
+def test_check_survives_getloadavg_being_absent(monkeypatch):
+    """The real Termux shape: os.getloadavg is not there at all.
+
+    Production guards this with hasattr(), so the metric must be reported
+    unavailable rather than raising or being faked.
+    """
+    _block_psutil(monkeypatch)
+    monkeypatch.delattr(sh.os, "getloadavg", raising=False)
+    assert not hasattr(sh.os, "getloadavg")
+
+    result = SystemHealth().check()
+    assert result["cpu_load_1m"] is None
+    assert result["unavailable"]["cpu_load_1m"] == "getloadavg_unavailable"
+    # and the check as a whole still completed
+    assert result["status"] in ("HEALTHY", "WARNING", "CRITICAL")
+
+
 def test_unknown_metrics_are_none_never_zero(monkeypatch):
     """The old fallback reported cpu 0 / memory 0, which read as real."""
     _block_psutil(monkeypatch)
