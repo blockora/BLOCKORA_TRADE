@@ -25,11 +25,17 @@ RETURN CONTRACT (rank / rank_strikes):
     NOTE: legacy lookup used str(strike) keys, but BOTH chain producers
     (main._build_angel_chain, option_chain_engine) key ce_data/pe_data by
     int strikes. Keys are normalised here so both int and str lookups work.
+
+    The ten factor names, maxima and reason thresholds are defined once in
+    engines.ranking.factors and imported here. The dashboard reads the same
+    definition, so the weights it prints cannot drift from the weights the
+    scorer actually applies.
 """
 
 from datetime import datetime
 
 from data.strike_brain import calculate_entry_price, calculate_stop_loss, calculate_targets
+from engines.ranking.factors import FACTORS, MAX_TOTAL_SCORE, maximum_for
 
 
 class StrikeRankingEngine:
@@ -250,17 +256,21 @@ class StrikeRankingEngine:
     # ------------------------------------------------------------------
     def _score_strike(self, strike, spot, opt_type, ce_data, pe_data, chain, market_data,
                       analysis_results, time_to_expiry, is_expiry, is_monthly):
-        """10-factor scoring system - Total: 100 points"""
+        """10-factor scoring system.
+
+        Factor names, maxima and reason thresholds come from
+        engines.ranking.factors, the same definition the dashboard reads.
+        """
 
         my_data = (ce_data if opt_type == "CE" else pe_data).get(strike, {})
 
         scores = {}
         reasons = []
 
-        # === FACTOR 1: Moneyness/Delta (15 pts) ===
+        # === FACTOR 1: Moneyness/Delta ===
         distance = abs(strike - spot)
         if distance <= 25:
-            scores["moneyness"] = 15
+            scores["moneyness"] = maximum_for("moneyness")
             reasons.append("ATM (Max Delta)")
         elif distance <= 75:
             scores["moneyness"] = 12
@@ -272,27 +282,27 @@ class StrikeRankingEngine:
         else:
             scores["moneyness"] = 2
 
-        # === FACTOR 2: Gamma Impact (10 pts) ===
+        # === FACTOR 2: Gamma Impact ===
         scores["gamma"] = self._gamma_score(strike, spot, time_to_expiry, opt_type)
-        if scores["gamma"] >= 12:
+        if scores["gamma"] >= FACTORS["gamma"].reason_threshold:
             reasons.append("Gamma Blast Zone")
 
-        # === FACTOR 3: Expected Move Fit (15 pts) ===
+        # === FACTOR 3: Expected Move Fit ===
         exp_move = (analysis_results.get("trade_context", {}) or {}).get("expected_move", 30)
         scores["move_fit"] = self._move_fit_score(strike, spot, exp_move, opt_type, my_data)
-        if scores["move_fit"] >= 10:
+        if scores["move_fit"] >= FACTORS["move_fit"].reason_threshold:
             reasons.append("Sweet Move Zone")
 
-        # === FACTOR 4: OI Quality (12 pts) ===
+        # === FACTOR 4: OI Quality ===
         pcr = chain.get("pcr", 1.0)
         scores["oi"] = self._enhanced_oi_score(strike, opt_type, spot, ce_data, pe_data, pcr)
 
-        # === FACTOR 5: Volume Velocity (10 pts) ===
+        # === FACTOR 5: Volume Velocity ===
         hist_key = (strike, opt_type)
         hist_vols = self.historical_volumes.get(hist_key, [])
         hist_avg = sum(hist_vols) / max(1, len(hist_vols))
         scores["volume"] = self._volume_velocity_score(my_data, hist_avg)
-        if scores["volume"] >= 8:
+        if scores["volume"] >= FACTORS["volume"].reason_threshold:
             reasons.append("Volume Spike")
 
         if hist_key not in self.historical_volumes:
@@ -300,21 +310,21 @@ class StrikeRankingEngine:
         self.historical_volumes[hist_key].append(float(my_data.get("volume", 0) or 0))
         self.historical_volumes[hist_key] = self.historical_volumes[hist_key][-20:]
 
-        # === FACTOR 6: Spread Efficiency (8 pts) ===
+        # === FACTOR 6: Spread Efficiency ===
         scores["spread"] = self._spread_score(my_data)
 
-        # === FACTOR 7: Trend Confluence (12 pts) ===
+        # === FACTOR 7: Trend Confluence ===
         scores["trend"] = self._trend_confluence_score(strike, opt_type, analysis_results)
 
-        # === FACTOR 8: VWAP Distance (8 pts) ===
+        # === FACTOR 8: VWAP Distance ===
         vwap = market_data.get("vwap", spot)
         scores["vwap"] = self._vwap_score(spot, vwap, strike, opt_type, analysis_results)
 
-        # === FACTOR 9: Max Pain (5 pts) ===
+        # === FACTOR 9: Max Pain ===
         max_pain = chain.get("max_pain", 0)
         scores["max_pain"] = self._max_pain_score(strike, max_pain)
 
-        # === FACTOR 10: Historical Win Rate (5 pts) ===
+        # === FACTOR 10: Historical Win Rate ===
         scores["historical"] = self._historical_score(strike, opt_type, analysis_results)
 
         # === PENALTIES ===
@@ -339,8 +349,8 @@ class StrikeRankingEngine:
         candidate = {
             "strike": strike,
             "option_type": opt_type,
-            "score": max(0, min(100, total)),
-            "total_score": max(0, min(100, total)),
+            "score": max(0, min(MAX_TOTAL_SCORE, total)),
+            "total_score": max(0, min(MAX_TOTAL_SCORE, total)),
             "scores": scores,
             "reasons": reasons,
             "ltp": my_data.get("ltp", 0),
@@ -551,7 +561,7 @@ class StrikeRankingEngine:
         elif opt_type == "PE" and macd_hist < 0:
             score += 2
 
-        return min(12, score)
+        return min(maximum_for("trend"), score)
 
     def _vwap_score(self, spot, vwap, strike, opt_type, analysis_results):
         """VWAP-based institutional bias"""
@@ -586,7 +596,7 @@ class StrikeRankingEngine:
         learning = analysis_results.get("learning", {}) or {}
         strike_key = f"{strike}_{opt_type}"
         win_rate = (learning.get("strike_win_rates", {}) or {}).get(strike_key, 0.5)
-        return int(win_rate * 5)
+        return int(win_rate * maximum_for("historical"))
 
     def _get_time_to_expiry(self, ctx):
         """Hours to expiry calculation"""

@@ -124,10 +124,25 @@ def _display_src():
 
 
 def test_displayed_factor_weights_match_real_scorer():
+    """The dashboard must read the scorer's definition, not its own copy.
+
+    These two assertions used to check that the maxima were spelled out as
+    literals in main.py. That is exactly the duplication this change removes:
+    the display now imports engines.ranking.factors, so the check is that the
+    shared definition is the source for both sides. The rendering itself is
+    covered by tests/test_ranking_factors_source_of_truth.py.
+    """
     src = _display_src()
-    for factor, mx in FACTOR_MAX.items():
-        assert f'"{factor}": {mx}' in src, f"{factor} max {mx} must be displayed"
-    assert sum(FACTOR_MAX.values()) == 100
+    assert "from engines.ranking.factors import" in _repo_main()
+    assert "_spec.maximum" in src and "_spec.label" in src
+    # the definition is authoritative and still sums to 100
+    from engines.ranking.factors import FACTOR_SPECS, MAX_TOTAL_SCORE
+    assert {s.key: s.maximum for s in FACTOR_SPECS} == FACTOR_MAX
+    assert sum(FACTOR_MAX.values()) == MAX_TOTAL_SCORE == 100
+
+
+def _repo_main():
+    return (Path(__file__).resolve().parent.parent / "main.py").read_text()
 
 
 def test_displayed_weights_sum_to_one_hundred():
@@ -138,9 +153,13 @@ def test_fake_static_weight_map_is_gone():
     """The static weight_map mislabelled Delta as 20% of the score."""
     src = _display_src()
     assert "weight_map" not in src, "static weight_map must not come back"
-    assert "'Delta':20" not in src and '"Delta":20' not in src
-    # the real factor maxima must be the only weights shown
-    assert "_FACTOR_MAX" in src
+    q = chr(34)
+    assert "'Delta':20" not in src
+    assert q + "Delta" + q + ":20" not in src
+    # no local weight table of any kind survives
+    assert "_FACTOR_MAX" not in src and "_FACTOR_LABEL" not in src
+    # weights come from the shared definition
+    assert "FACTOR_SPECS" in src
 
 
 def test_phantom_brain_engine_columns_are_gone():

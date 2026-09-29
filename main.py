@@ -19,6 +19,7 @@ from engines.decision.master_decision_engine import MasterDecisionEngine
 from engines.confidence.confidence_engine import ConfidenceEngine
 from engines.risk.risk_engine import RiskEngine
 from engines.ranking.strike_ranking_engine import StrikeRankingEngine
+from engines.ranking.factors import FACTOR_SPECS, MAX_TOTAL_SCORE
 from engines.learning.outcome_tracker import OutcomeTracker, SelfLearner
 from data.data_freshness_guard import DataFreshnessGuard
 from engines.liquidity.liquidity_engine import LiquidityEngine
@@ -1231,7 +1232,8 @@ class BlockoraTrade:
         print(f"  ⚡ DECISION: {action} | {grade} | {reason}")
         print(f"  📊 Spot: {spot} | Decision Time: {rec.get('time', 'N/A')}")
         _final_disp = f"{_final_score}" if isinstance(_final_score, (int, float)) else str(_final_score)
-        print(f"  📈 Final Ranking Score: {_final_disp}/100 (10 real factors, see breakdown)")
+        print(f"  📈 Final Ranking Score: {_final_disp}/{MAX_TOTAL_SCORE} "
+              f"({len(FACTOR_SPECS)} real factors, see breakdown)")
         print(f"{'─'*70}")
         print(f"  💰 Entry: ₹{entry:.2f} | 🛑 SL: ₹{sl:.2f}")
         print(f"  🎯 T1: ₹{t1:.2f} ({t1_p}% probability) | Book 50%")
@@ -1241,25 +1243,18 @@ class BlockoraTrade:
         print(f"  📏 Risk-Reward: 1:{rr:.2f} | 📉 Move: {ctx.get('expected_move', 30):.0f} pts (30min)")
         print(f"{'─'*70}")
         # --- REAL RANKING FACTOR BREAKDOWN -------------------------------
-        # These are the ACTUAL factors and ACTUAL maxima used by
-        # StrikeRankingEngine.rank() (they sum to exactly 100). The previous
-        # hardcoded weight table was unrelated to the scorer and mislabelled
-        # Delta as 20% when delta carries 0 points in the real score.
-        _FACTOR_MAX = {"moneyness": 15, "gamma": 10, "move_fit": 15, "oi": 12,
-                       "volume": 10, "spread": 8, "trend": 12, "vwap": 8,
-                       "max_pain": 5, "historical": 5}
-        _FACTOR_LABEL = {"moneyness": "Moneyness", "gamma": "Gamma Impact",
-                         "move_fit": "Expected-Move Fit", "oi": "OI Quality",
-                         "volume": "Volume Velocity", "spread": "Spread Efficiency",
-                         "trend": "Trend Confluence", "vwap": "VWAP Distance",
-                         "max_pain": "Max Pain", "historical": "Historical Win Rate"}
+        # Factor names, labels and maxima come from the SAME immutable
+        # definition the scorer applies, so this display cannot drift from
+        # the actual scoring implementation.
         _real_scores = _best.get("scores") or {}
-        print(f"  ✅ RANKING FACTORS (real weights, sum 100) for {_best_strike} {_best_type}:")
-        for _f, _mx in _FACTOR_MAX.items():
-            _v = _real_scores.get(_f)
-            _vs = f"{_v}/{_mx}" if isinstance(_v, (int, float)) else f"Unavailable (max {_mx})"
-            print(f"      • {_FACTOR_LABEL[_f]:<22} {_vs}")
-        print(f"      • {'TOTAL':<22} {_final_disp}/100")
+        print(f"  ✅ RANKING FACTORS (real weights, sum {MAX_TOTAL_SCORE}) "
+              f"for {_best_strike} {_best_type}:")
+        for _spec in FACTOR_SPECS:
+            _v = _real_scores.get(_spec.key)
+            _vs = (f"{_v}/{_spec.maximum}" if isinstance(_v, (int, float))
+                   else f"Unavailable (max {_spec.maximum})")
+            print(f"      • {_spec.label:<22} {_vs}")
+        print(f"      • {'TOTAL':<22} {_final_disp}/{MAX_TOTAL_SCORE}")
         print(f"{'─'*70}")
         
         # --- MARKET SNAPSHOT ---
