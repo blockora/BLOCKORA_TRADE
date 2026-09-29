@@ -61,10 +61,29 @@ exclusively for NIFTY derivatives. It analyzes live market data using
 - Telegram Bot Token
 - Telegram Chat ID
 
+## v3 Rebuild — Design & Status
+
+A statistically-honest v3 rebuild is in progress (spec: `brain.md`, design: `docs/`). Key principles:
+
+- `model_score` is a RANKING metric only. It is never shown as a probability.
+- `calibrated_confidence` comes only from historical outcomes (docs/CALIBRATION.md) and reports
+  `UNAVAILABLE` until real data exists. Confidence values are never invented.
+- Hard filters veto any score. NO_TRADE is a first-class decision and the system can always return it.
+- Correlated evidence (BOS/momentum/FVG/volume…) is damped via feature groups — one event cannot
+  inflate the score through many redundant witnesses (docs/SCORING.md §4).
+
+Read `docs/ARCHITECTURE.md` first, then `docs/ROADMAP.md` for phase status and open decisions.
+
+Run tests:
+
+    python3 -m pytest tests/
+
 ## Disclaimer
 
 This is a Decision Support System only. It does not guarantee profits.
+No claim of probability, edge or win rate is made unless backed by recorded outcomes and
+calibration metrics with stated sample sizes.
 Trading involves risk. Always trade responsibly.
 
 ---
-**Version:** 2.1 | **Status:** Production Ready ✅ 
+**Version:** 2.1 (legacy) + v3 Phase 1 | **Status:** v3 design approved pending; legacy runtime intact

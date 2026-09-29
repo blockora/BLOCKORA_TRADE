@@ -11,7 +11,13 @@ class DatabaseManager:
     def __init__(self, config, logger=None):
         self.config = config
         self.logger = logger
-        self.db_path = config.get("database.path", "./database/blockora_trade.db")
+        raw_path = config.get("database.path", "./database/blockora_trade.db")
+        # Anchor relative paths to the project root — starting the app from a
+        # different CWD must never silently point at a different database.
+        p = Path(raw_path)
+        if not p.is_absolute():
+            p = Path(getattr(config, "project_root", Path.cwd())) / p
+        self.db_path = str(p)
         self.connection = None
 
     def initialize(self):
@@ -115,7 +121,10 @@ class DatabaseManager:
             ))
             self.connection.commit()
         except Exception as e:
-            pass
+            # Decision rows are the audit trail; a silent drop would corrupt
+            # session stats and outcome tracking. Log loudly, never hide it.
+            if self.logger:
+                self.logger.error(f"store_decision failed (decision NOT persisted): {e}")
 
     def get_session_summary(self):
         """Get today's session summary"""

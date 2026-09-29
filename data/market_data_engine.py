@@ -514,10 +514,13 @@ class MarketDataEngine:
                         for exp in available_exps:
                             try:
                                 exp_date = _dt.strptime(exp, "%d%b%Y").date()
-                                if exp_date >= today:
-                                    future_exps.append((exp_date, exp))
-                            except:
+                            except (ValueError, TypeError):
+                                # Malformed expiry string in scrip master — skip it,
+                                # never let a data-format error escape as a crash.
+                                self.logger.warning(f"Unparsable expiry in scrip master: {exp!r}")
                                 continue
+                            if exp_date >= today:
+                                future_exps.append((exp_date, exp))
                         
                         if future_exps:
                             future_exps.sort()

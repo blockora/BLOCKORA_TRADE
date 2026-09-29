@@ -11,7 +11,9 @@ class LoggerManager:
 
     def __init__(self, config):
         self.config = config
-        self.log_dir = Path(config.get("logging.directory", "./logs"))
+        raw = Path(config.get("logging.directory", "./logs"))
+        # Anchor relative log dir to the project root (CWD-independent startup).
+        self.log_dir = raw if raw.is_absolute() else Path(getattr(config, "project_root", Path.cwd())) / raw
 
     def _cleanup_old_log_folders(self):
         """Auto-rotation: delete log folders older than 3 days (keep today + last 2 days)"""

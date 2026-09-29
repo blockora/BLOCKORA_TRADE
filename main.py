@@ -105,7 +105,7 @@ class BlockoraTrade:
                 print("  ✓ Telegram Bot connected")
             else:
                 print("  ⚠️ Telegram not configured/connected")
-            self.freshness_guard = DataFreshnessGuard(self.logger)
+            self.freshness_guard = DataFreshnessGuard(self.logger, self.config)
             self.liquidity_engine = LiquidityEngine(self.logger)
             self._prev_oi = {}  # change-OI tracking: (option_type, strike) -> previous_oi
             self.regime_engine = MarketRegimeEngine(self.logger, self.config)
@@ -182,8 +182,14 @@ class BlockoraTrade:
         now = self.config.now() if self.config else datetime.now()
         if now.weekday() >= 5:
             return False
-        market_open = dtime(9, 15)
-        market_close = dtime(15, 30)
+        # settings.json market_hours (documented) — previously hardcoded.
+        open_s = self.config.get("market_hours.open", "09:15") if self.config else "09:15"
+        close_s = self.config.get("market_hours.close", "15:30") if self.config else "15:30"
+        try:
+            market_open = dtime(*map(int, str(open_s).split(":")))
+            market_close = dtime(*map(int, str(close_s).split(":")))
+        except (TypeError, ValueError):
+            market_open, market_close = dtime(9, 15), dtime(15, 30)
         return market_open <= now.time() <= market_close
 
     def _build_angel_chain(self, market_data):
@@ -372,16 +378,8 @@ class BlockoraTrade:
                     "source": "JUGAAD_DATA"}
         except Exception as e:
             self.logger.error(f"Jugaad fallback chain failed: {e}")
-            # Reset freshness guard so new data is accepted
-            self.freshness_guard.mark_fetch()
-            # Update market_data with required fields for freshness guard
-            market_data["timestamp"] = datetime.now().isoformat()
-            market_data["candles"] = []
-            # Try fallback to jugaad-data
-            try:
-                return self._jugaad_fallback_chain(market_data.get("ltp", 0), strikes)
-            except Exception:
-                return None
+            # Failed fetch must NOT be marked fresh (P0-3 policy); simply fail the chain.
+            return None
 
     def _calculate_max_pain(self, ce_data, pe_data, min_strikes=5):
         """BUG #5: Actual max pain calculate karo — strike jahan total option writer pain MAX ho.

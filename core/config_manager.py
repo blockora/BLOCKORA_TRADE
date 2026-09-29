@@ -52,6 +52,10 @@ class ConfigManager:
 
     def get(self, key, default=None):
         """Get configuration value with dot notation support"""
+        # DATABASE_PATH env override (documented in .env.example) maps onto the
+        # settings.json `database.path` key so the documented env var actually works.
+        if key == "database.path" and os.getenv("DATABASE_PATH"):
+            return os.getenv("DATABASE_PATH")
         if key in self.env_config:
             return self.env_config[key]
         keys = key.split(".")

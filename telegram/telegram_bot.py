@@ -15,6 +15,17 @@ class TelegramBot:
         self._fail_logged = False
         self.channel_id = str(config.get("TELEGRAM_CHANNEL_ID", "") or "")
 
+    def _redact(self, text: str) -> str:
+        """Strip the bot token from any message before logging.
+
+        The Telegram token lives in the URL path, and requests exceptions
+        embed that path (e.g. '.../bot<token>/getMe') — logging the raw
+        exception would leak the credential into log files.
+        """
+        if self.bot_token and self.bot_token in text:
+            text = text.replace(self.bot_token, "<redacted>")
+        return text
+
     def initialize(self):
         """Initialize Telegram bot"""
         self.connected = False  # P1-2: default not connected
@@ -29,7 +40,7 @@ class TelegramBot:
             else:
                 self.logger.error(f"Telegram Bot connection failed: {response.status_code}")
         except Exception as e:
-            self.logger.error(f"Telegram init error: {str(e)[:80]}")
+            self.logger.error(f"Telegram init error: {self._redact(str(e))[:80]}")
 
     def send_message(self, text, parse_mode="HTML"):
         """Send message to Telegram with STRICT timeout to prevent freezing"""

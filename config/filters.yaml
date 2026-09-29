@@ -1,0 +1,67 @@
+# BLOCKORA_TRADE v3 — hard filters & NO-TRADE policy (Phase 1 defaults)
+# Every value here is a HEURISTIC starting point (docs/ASSUMPTIONS.md); deliberately conservative.
+# Filters are binary vetoes: any FAIL means NO_TRADE regardless of model_score.
+
+version: 1
+
+session:
+  market_open: "09:15"
+  market_close: "15:30"
+  days: [0, 1, 2, 3, 4]          # Mon..Fri
+  timezone: "Asia/Kolkata"
+
+data_quality:
+  max_latency_ms: 750            # F3
+  max_tick_age_s: 5              # F3
+  max_chain_age_s: 3             # F15
+  max_source_lag_s: 10           # F2 heartbeat
+  require_critical_fields: [spot, ltp, bid, ask]   # F4
+  max_unavailable_components: 2  # F8 (docs/SCORING.md section 5)
+
+liquidity:
+  max_spread_pct: 3.0            # F5
+  min_volume: 1000               # F6
+  min_oi: 500                    # F6
+
+entry:
+  max_entry_deviation_pct: 5.0   # F7 vs LTP
+  slippage_fraction_of_spread: 0.25
+
+volatility:
+  min_iv: 8.0                    # F9 band for buying options
+  max_iv: 80.0
+  max_iv_rank: 80.0              # spec section 10: never recommend during high IV
+  abnormal_bar_atr_multiple: 5.0 # F13 candle range vs ATR
+
+risk:
+  min_rr: 1.5                    # F10, evaluated on the book-ladder R:R (docs/ASSUMPTIONS.md C-6)
+  atr_multiplier_sl: 1.0         # 1.5 made ANY min_rr >= 1.14 unreachable (see C-6/C-7)
+  atr_multiplier_t1: 1.0
+  atr_multiplier_t2: 2.0
+  atr_multiplier_t3: 3.0
+
+contract:
+  min_dte: 1                     # F11
+  strike_step: 50
+  strike_window_atm: 3           # +-3 strikes from ATM (spec section 1.1)
+
+regime:
+  allowed_classifications: [ALIGNED, PULLBACK, WEAK_ALIGNMENT]   # F12
+  min_margin_for_weak_alignment: 15.0
+
+dedup:
+  window_min: 30                 # F14
+  max_signals_per_day: 2
+
+circuit_breakers:
+  max_trades_per_day: 2
+  max_consecutive_losses: 2      # stricter of the spec's two values (docs/ASSUMPTIONS.md C-4)
+  max_daily_loss_pct: 5.0
+
+calibration_gate:                # dormant until Phase 8 provides CALIBRATED data
+  enabled: false
+  min_contextual_hit_rate: 0.45
+  min_bucket_samples: 30
+
+no_trade:
+  persist_rows: true             # keep NO_TRADE rows for denominator statistics

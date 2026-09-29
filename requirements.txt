@@ -14,3 +14,8 @@ pandas
 numpy
 pycryptodome
 smartapi-python==1.5.5
+# smartapi-python 1.5.5 imports logzero but does NOT declare it in its
+# package metadata -> pip check passes, runtime import fails without this.
+logzero
+psutil          # optional system health metrics (core/system_health.py degrades gracefully without it)
+pytest          # documented test runner (README: python3 -m pytest tests/)

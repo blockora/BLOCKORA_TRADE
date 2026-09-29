@@ -8,4 +8,11 @@ node_modules/
 lib/scipy/
 data/OpenAPIScripMaster.json
 database/*.db
-__pycache__/
+database/*_backup_*.db
+
+# Runtime artifacts — never commit
+logs/
+backup/
+cache/
+shadow_data/
+.pytest_cache/

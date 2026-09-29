@@ -1,0 +1,36 @@
+# BLOCKORA_TRADE v3 — system settings (Phase 1)
+# Secrets (Angel One / Telegram credentials) are NEVER here; they come from environment
+# variables (.env) and are read via get_credentials() at runtime.
+
+version: 1
+
+application:
+  name: "BLOCKORA_TRADE"
+  mode: "recommendation_only"     # the only supported mode by design
+  pipeline_version: "3.0.0-phase1"
+
+database:
+  path: "database/blockora.db"
+  journal_mode: "WAL"
+  busy_timeout_ms: 5000
+
+market:
+  symbol: "NIFTY"
+  exchange: "NFO"
+  strike_step: 50
+  lot_size: 75                    # current NIFTY lot size (verify at deploy time)
+  expiry_policy: "NEXT_WEEKLY"    # adapter responsibility: resolve to the actual nearest weekly expiry
+
+timeframes:
+  execution: "5m"                 # LTF
+  trend: "15m"                    # MTF
+  regime: "1h"                    # HTF
+  max_hold_bars: 24               # outcome window on the execution timeframe
+
+logging:
+  level: "INFO"
+  dir: "logs"
+
+paths:
+  docs: "docs"
+  schema: "database/schema.sql"

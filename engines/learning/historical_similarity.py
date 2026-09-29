@@ -7,6 +7,11 @@ modify ranking, scores, strikes, or winner selection.
 Historical evidence is INFORMATIONAL ONLY.
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from engines.learning.market_memory import MarketMemory
+
 
 # --- Similarity weights (bounded, sum to 100) ---
 
@@ -472,7 +477,7 @@ def build_evidence(
 
 def get_historical_evidence(
     current_observation: dict,
-    memory: MarketMemory,
+    memory: "MarketMemory",
     threshold: int = 70,
     max_results: int = 20,
 ) -> dict:

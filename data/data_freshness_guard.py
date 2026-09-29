@@ -13,9 +13,19 @@ class DataFreshnessGuard:
     CHAIN_MAX_SEC = 60
     CANDLE_MAX_MIN = 20
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, config=None):
         self.logger = logger
         self._fetch_time = 0
+        # Documented overrides (settings.json): freshness.spot_max_age_seconds,
+        # freshness.chain_max_age_seconds — previously documented but never read.
+        if config is not None:
+            try:
+                self.SPOT_MAX_SEC = float(config.get("freshness.spot_max_age_seconds", self.SPOT_MAX_SEC))
+                self.CHAIN_MAX_SEC = float(config.get("freshness.chain_max_age_seconds", self.CHAIN_MAX_SEC))
+            except (TypeError, ValueError):
+                # Bad config must not disable freshness checking — keep defaults.
+                self.SPOT_MAX_SEC = 60
+                self.CHAIN_MAX_SEC = 60
 
     def mark_fetch(self):
         self._fetch_time = time.time()
