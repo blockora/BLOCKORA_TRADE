@@ -466,6 +466,12 @@ class BlockoraTrade:
         try:
             self.cycle_count += 1
 
+            # Single cycle timestamp, IST-aware via the config-driven timezone
+            # helper (same convention as is_market_open). Bound ONCE at the top
+            # of the cycle so every stage — and the persisted decision row —
+            # reports the same time, and so the name is always in scope below.
+            now = self.config.now() if self.config else datetime.now()
+
             market_data = self.market_engine.get_live_data()
             if not market_data:
                 return None

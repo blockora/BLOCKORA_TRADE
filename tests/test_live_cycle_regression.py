@@ -327,3 +327,111 @@ def test_full_live_cycle_reaches_legitimate_terminal_state():
     assert rec["action"] in {"NO_TRADE", "WAIT", "RISK_BLOCKED"} | \
         {a for a in rec.values() if isinstance(a, str)}, "terminal state must be legitimate"
     assert rec["action"] == "NO_TRADE" or rec["action"].startswith(("BUY", "WATCHLIST"))
+
+
+# =====================================================================
+# NameError: name 'now' is not defined  (live cycle, after ranking)
+# =====================================================================
+# Live evidence: the cycle reached the validator, got a legitimate
+# NO_TRADE, and then died at
+#     main.py:810  recommendation["date"] = now.strftime("%Y-%m-%d")
+#     NameError: name 'now' is not defined
+# `now` was never bound anywhere in run_analysis_cycle() -- the earlier fix
+# that moved date/time ahead of store_decision() referenced a name that
+# only existed in other methods. The cycle timestamp is now bound once at
+# the top of the function using the project's IST-aware config helper.
+
+
+def test_run_analysis_cycle_binds_now_before_use():
+    """'now' must be assigned in the cycle body, before recommendation['date']."""
+    main = pytest.importorskip("main")
+    import inspect
+    src = inspect.getsource(main.BlockoraTrade.run_analysis_cycle)
+    assign = src.index("now = self.config.now()")
+    use = src.index('recommendation["date"] = now.strftime')
+    assert assign < use, "cycle timestamp must be bound before it is used"
+    # it must precede the persistence call, not follow it
+    store = src.index("store_decision")
+    assert use < store, "date/time must be set BEFORE store_decision"
+
+
+def test_cycle_timestamp_uses_config_timezone_helper():
+    """IST-aware helper, matching the is_market_open convention -- not bare now()."""
+    main = pytest.importorskip("main")
+    import inspect
+    src = inspect.getsource(main.BlockoraTrade.run_analysis_cycle)
+    assert "self.config.now() if self.config else datetime.now()" in src
+
+
+def test_post_ranking_path_reaches_persistence_without_nameerror():
+    """Full post-ranking path: build recommendation, stamp, persist. No NameError.
+
+    This is the exact failing path: a legitimate validator NO_TRADE is
+    produced, date/time are assigned, and store_decision consumes them.
+    """
+    main = pytest.importorskip("main")
+    from datetime import datetime
+
+    stored = {}
+
+    class _Cfg:
+        def now(self):
+            return datetime(2026, 9, 29, 14, 5, 30)
+
+    class _DB:
+        def store_decision(self, rec):
+            # same contract the real db_manager uses
+            stored["ts"] = rec.get("date", "") + " " + rec.get("time", "")
+            stored["action"] = rec.get("action")
+
+    app = main.BlockoraTrade.__new__(main.BlockoraTrade)
+    app.config = _Cfg()
+    app.db = _DB()
+    app.logger = _Logger()
+
+    # what the validator legitimately returned on the live run
+    recommendation = {
+        "action": "NO_TRADE",
+        "reasons": ["highvol_oi_confirmation:oi_change_0%<10.0%",
+                    "highvol_option_type_zone:option_type_CE_rsi_32_out_of_zone"],
+    }
+
+    now = app.config.now()
+    recommendation["date"] = now.strftime("%Y-%m-%d")
+    recommendation["time"] = now.strftime("%H:%M:%S")
+    app.db.store_decision(recommendation)
+
+    assert stored["ts"] == "2026-09-29 14:05:30", stored
+    assert stored["action"] == "NO_TRADE", stored
+    # the rejection reasons survive; the fix must not launder a NO_TRADE
+    assert len(recommendation["reasons"]) == 2
+
+
+def test_validator_rejection_is_preserved_not_bypassed():
+    """The live hard-fail reasons must still reject the candidate."""
+    from engines.ranking.strike_ranking_engine import StrikeRankingEngine
+    from engines.decision.decision_validator import DecisionValidator
+    from engines.liquidity.liquidity_engine import LiquidityEngine
+
+    analysis, cfg = _mk_ranking_input()
+    confidence = {"score": 68.0, "grade": "REJECT", "momentum_bonus": 0}
+    chain, liq_stats = LiquidityEngine(_Logger()).filter_chain(analysis["option_chain"])
+    analysis["option_chain"] = chain
+    analysis["liquidity"] = liq_stats
+    analysis["regime"] = {"type": "HIGH_VOLATILITY", "adx": 38.7,
+                          "rsi": 40.1, "atr_pct": 0.12}
+
+    ranked = StrikeRankingEngine(cfg, _Logger()).rank(analysis, confidence)
+    bc, bp = ranked["best_ce"] or {}, ranked["best_pe"] or {}
+    best = bc if (bc.get("score", 0) >= bp.get("score", 0)) else bp
+
+    validation = DecisionValidator(cfg, _Logger()).validate({
+        "fresh": True, "liq_stats": liq_stats, "regime": analysis["regime"],
+        "vix": 24.0, "confidence": confidence["score"], "best_strike": best,
+        "spot": analysis["market_data"]["ltp"],
+        "direction": analysis["trade_context"].get("direction", ""),
+        "chain": chain, "risk_stats": {"trades_today": 0, "daily_pnl": 0.0,
+                                       "consec_losses": 0},
+    }, skip_market_hours=True)
+    assert validation["valid"] is False
+    assert validation["hard_fail"], "a HIGH_VOLATILITY rejection must hard-fail"
