@@ -192,6 +192,61 @@ class BlockoraTrade:
             market_open, market_close = dtime(9, 15), dtime(15, 30)
         return market_open <= now.time() <= market_close
 
+    def _attach_greeks(self, chain, spot):
+        """Attach Black-Scholes greeks to every chain record that has a REAL IV.
+
+        Angel One SmartAPI does not supply option greeks, and the NSE chain has
+        none either, so greeks here are DERIVED (calculated), never broker-sourced.
+        They are computed only from a real implied volatility; if the IV is
+        missing or non-positive the record is left without greeks and the
+        dashboard reports it as unavailable. No greeks are ever invented.
+
+        Uses the broker-detected expiry (not a guessed weekday) and the IST
+        market close, matching the ranking engine's time-to-expiry logic.
+        """
+        from engines.ranking.greeks import black_scholes
+
+        if not isinstance(chain, dict) or not spot or spot <= 0:
+            return chain
+        expiry = chain.get("expiry") or getattr(getattr(self, "market_engine", None),
+                                                "detected_expiry", "") or ""
+        try:
+            exp_dt = datetime.strptime(expiry, "%d%b%Y")
+        except (TypeError, ValueError):
+            return chain  # no real expiry -> do not guess DTE -> no greeks
+
+        now = self.config.now() if self.config else datetime.now()
+        close_s = self.config.get("market_hours.close", "15:30") if self.config else "15:30"
+        try:
+            close_t = datetime.strptime(close_s, "%H:%M").time()
+        except (TypeError, ValueError):
+            close_t = dtime(15, 30)
+        if now.date() == exp_dt.date():
+            market_close = datetime.combine(now.date(), close_t)
+            years = max(0.0, (market_close - now).total_seconds() / 3600.0) / 8760.0
+        else:
+            years = max(0.0, (exp_dt - now).days) / 365.0
+        if years <= 0:
+            return chain  # expired / zero time value -> no greeks
+
+        days = max(1, int(round(years * 365)))
+        attached = 0
+        for side in ("ce_data", "pe_data"):
+            opt_type = "CE" if side == "ce_data" else "PE"
+            for rec in (chain.get(side) or {}).values():
+                if not isinstance(rec, dict):
+                    continue
+                g = black_scholes(spot, rec.get("strike"), days, rec.get("iv", 0), opt_type)
+                if g:
+                    rec["greeks"] = g
+                    rec["greeks_source"] = "DERIVED_BS"
+                    attached += 1
+        if attached:
+            chain["greeks_source"] = "DERIVED_BS"
+            chain["greeks_note"] = ("Calculated via Black-Scholes from real NSE IV; "
+                                    "Angel One does not provide greeks.")
+        return chain
+
     def _build_angel_chain(self, market_data):
         """Angel One live data se NSE-format option chain banata hai"""
         try:
@@ -573,6 +628,14 @@ class BlockoraTrade:
                 analysis_results.setdefault("trade_context", {})["expiry_date"] = _expiry
                 option_chain.setdefault("expiry", _expiry)
 
+            # 📐 GREEKS: derived from real NSE IV via Black-Scholes. Records with
+            # no real IV are left untouched and reported as unavailable.
+            try:
+                option_chain = self._attach_greeks(option_chain, market_data.get("ltp", 0))
+                analysis_results["option_chain"] = option_chain
+            except Exception as e:
+                self.logger.warning(f"Greeks attach skipped: {e}")
+
             ranked_strikes = self.ranking_engine.rank(analysis_results, confidence)
             risk_assessment = self.risk_engine.evaluate(analysis_results, confidence)
 
@@ -815,6 +878,46 @@ class BlockoraTrade:
 
             recommendation["date"] = now.strftime("%Y-%m-%d")
             recommendation["time"] = now.strftime("%H:%M:%S")
+
+            # --- Real analysis context for the audit trail (no secrets) ---
+            # Everything here already exists in the live objects; nothing is
+            # invented. Missing values stay None/empty rather than defaulted.
+            _ind = analysis_results.get("indicators", {}) or {}
+            _reg = analysis_results.get("regime", {}) or {}
+            _tctx = analysis_results.get("trade_context", {}) or {}
+            _oc = analysis_results.get("option_chain", {}) or {}
+            _best_ranked = (ranked_strikes.get("best_pe") or {} if _tctx.get("direction") == "BEARISH"
+                            else ranked_strikes.get("best_ce") or {}) or {}
+            if not _best_ranked:
+                _best_ranked = (ranked_strikes.get("best_ce") or {}) or (ranked_strikes.get("best_pe") or {})
+            recommendation["spot"] = market_data.get("ltp", 0)
+            recommendation["expiry"] = _oc.get("expiry", "")
+            recommendation["regime"] = (_reg.get("type", "") or "") + (("/" + _reg["classification"]) if _reg.get("classification") else "")
+            recommendation["rsi"] = _ind.get("rsi")
+            recommendation["adx"] = _ind.get("adx")
+            recommendation["atr"] = _ind.get("atr")
+            recommendation["vwap"] = _tctx.get("vwap")
+            recommendation["pcr"] = _oc.get("pcr")
+            recommendation["max_pain"] = _oc.get("max_pain")
+            recommendation["final_score"] = _best_ranked.get("score")
+            recommendation["score_breakdown"] = _best_ranked.get("scores", {}) or {}
+            recommendation["chain_source"] = _oc.get("source", "")
+            recommendation["data_provenance"] = {
+                "market_data": market_data.get("data_source", "UNKNOWN"),
+                "chain": _oc.get("source", "UNKNOWN"),
+                "iv": (_best_ranked.get("iv_source", "UNKNOWN")
+                       if _best_ranked.get("iv") else "UNAVAILABLE"),
+                "greeks": _best_ranked.get("greeks_source", "UNAVAILABLE"),
+                "pcr": _oc.get("pcr_source", "UNKNOWN"),
+                "max_pain": _oc.get("max_pain_source", "UNKNOWN"),
+            }
+            recommendation["diagnostics"] = {
+                "liquidity": analysis_results.get("liquidity", {}),
+                "regime": _reg,
+                "top3_margin": analysis_results.get("_top3_margin"),
+                "vix": recommendation.get("vix"),
+                "momentum": confidence.get("momentum_bonus", 0),
+            }
             self.db.store_decision(recommendation)
 
             # 🔥 SIGNAL LOCK + FIX #8: Blocked WATCHLIST notify (owner only, no VIP spam)
@@ -1113,17 +1216,11 @@ class BlockoraTrade:
             candle_at_key = cs_data.get("at_key_level", False)
         candle_sc = candle_score(candle_pattern, candle_at_key) if candle_pattern != "N/A" else "N/A"
         
-        factor_scores = {
-            'Delta': delta_sc,
-            'IV': iv_score(iv_rank),
-            'OI': oi_score(oi_change_pct, direction, _best_type),
-            'Liquidity': liquidity_score(vol, spread_pct),
-            'Technical': round(technical_score(rsi, adx, spot, vwap_val, macd_hist, direction), 1),
-            'Risk-Reward': rr_score(rr),
-            'Candle': candle_sc
-        }
-        
-        # For display
+        # NOTE: the old display-only factor block (Delta/IV/OI/Liquidity/
+        # Technical/RR/Candle with hardcoded weights) was removed. Those factors
+        # are NOT the ones rank() scores with, and delta is worth 0 real points,
+        # so labelling it 20% of the score was misleading. The real 10-factor
+        # breakdown is printed below, from the candidate's own `scores` dict.
         delta_display = f"{delta_val:.2f}" if isinstance(delta_val, float) else str(delta_val)
         candle_display = str(candle_pattern)
         
@@ -1132,11 +1229,9 @@ class BlockoraTrade:
         print(f"  ⚡ SCALPING MODE | 7-POINT TARGET")
         print(f"  🎯 BEST PICK: NIFTY {_best_strike} {_best_type}")
         print(f"  ⚡ DECISION: {action} | {grade} | {reason}")
-        print(f"  📊 Spot: {spot} | Time: {rec.get('time', time.strftime('%H:%M:%S'))}")
-        _brain_disp = f"{_brain_conf:.1f}" if isinstance(_brain_conf, (int, float)) else str(_brain_conf)
-        _engine_disp = f"{_engine_score}" if isinstance(_engine_score, (int, float)) else str(_engine_score)
+        print(f"  📊 Spot: {spot} | Decision Time: {rec.get('time', 'N/A')}")
         _final_disp = f"{_final_score}" if isinstance(_final_score, (int, float)) else str(_final_score)
-        print(f"  📈 Final Score: {_final_disp}/100 | Brain: {_brain_disp}% | Engine: {_engine_disp}/100")
+        print(f"  📈 Final Ranking Score: {_final_disp}/100 (10 real factors, see breakdown)")
         print(f"{'─'*70}")
         print(f"  💰 Entry: ₹{entry:.2f} | 🛑 SL: ₹{sl:.2f}")
         print(f"  🎯 T1: ₹{t1:.2f} ({t1_p}% probability) | Book 50%")
@@ -1145,15 +1240,26 @@ class BlockoraTrade:
         print(f"  📊 Confidence: {confidence:.1f}% ({grade})")
         print(f"  📏 Risk-Reward: 1:{rr:.2f} | 📉 Move: {ctx.get('expected_move', 30):.0f} pts (30min)")
         print(f"{'─'*70}")
-        print(f"  ✅ WHY {_best_strike} {_best_type}:")
-        for fname, fscore in factor_scores.items():
-            weight_map = {'Delta':20, 'IV':15, 'OI':15, 'Liquidity':10, 'Technical':20, 'Risk-Reward':10, 'Candle':10}
-            if fname == 'Delta':
-                print(f"      • Delta: {delta_display} → Score: {fscore}/10 (Weight: {weight_map.get(fname,0)}%)")
-            elif fname == 'Candle':
-                print(f"      • Candle: {candle_display} → Score: {fscore}/10 (Weight: {weight_map.get(fname,0)}%)")
-            else:
-                print(f"      • {fname}: {fscore}/10 (Weight: {weight_map.get(fname,0)}%)")
+        # --- REAL RANKING FACTOR BREAKDOWN -------------------------------
+        # These are the ACTUAL factors and ACTUAL maxima used by
+        # StrikeRankingEngine.rank() (they sum to exactly 100). The previous
+        # hardcoded weight table was unrelated to the scorer and mislabelled
+        # Delta as 20% when delta carries 0 points in the real score.
+        _FACTOR_MAX = {"moneyness": 15, "gamma": 10, "move_fit": 15, "oi": 12,
+                       "volume": 10, "spread": 8, "trend": 12, "vwap": 8,
+                       "max_pain": 5, "historical": 5}
+        _FACTOR_LABEL = {"moneyness": "Moneyness", "gamma": "Gamma Impact",
+                         "move_fit": "Expected-Move Fit", "oi": "OI Quality",
+                         "volume": "Volume Velocity", "spread": "Spread Efficiency",
+                         "trend": "Trend Confluence", "vwap": "VWAP Distance",
+                         "max_pain": "Max Pain", "historical": "Historical Win Rate"}
+        _real_scores = _best.get("scores") or {}
+        print(f"  ✅ RANKING FACTORS (real weights, sum 100) for {_best_strike} {_best_type}:")
+        for _f, _mx in _FACTOR_MAX.items():
+            _v = _real_scores.get(_f)
+            _vs = f"{_v}/{_mx}" if isinstance(_v, (int, float)) else f"Unavailable (max {_mx})"
+            print(f"      • {_FACTOR_LABEL[_f]:<22} {_vs}")
+        print(f"      • {'TOTAL':<22} {_final_disp}/100")
         print(f"{'─'*70}")
         
         # --- MARKET SNAPSHOT ---
@@ -1162,31 +1268,105 @@ class BlockoraTrade:
         pcr_val = analysis_results.get("oi_analysis", {}).get("pcr", "N/A")
         vwap_val = ctx.get("vwap", "N/A")
         mtf = analysis_results.get("multi_timeframe", {})
+        # Values below are produced by real engines that the dashboard was
+        # dropping. Anything absent is shown as Unavailable, never defaulted.
+        _md = analysis_results.get("market_data", {}) or {}
+        _oi = analysis_results.get("oi_analysis", {}) or {}
+        _sr = analysis_results.get("support_resistance", {}) or {}
+        _reg = analysis_results.get("regime", {}) or {}
+        _atr = indicators.get("atr", "N/A")
+        _mp = opt_chain.get("max_pain", "N/A")
+        _ohlc = (f"O {_md.get('open','—')} H {_md.get('high','—')} "
+                 f"L {_md.get('low','—')} C {_md.get('close','—')}")
         print(f"  📈 MARKET SNAPSHOT:")
-        print(f"     RSI: {rsi_val} | ADX: {adx_val} | PCR: {pcr_val} | VWAP: {vwap_val}")
+        print(f"     Spot: {spot} | OHLC: {_ohlc} | Source: {_md.get('data_source','N/A')}")
+        print(f"     RSI: {rsi_val} | ADX: {adx_val} | ATR: {_atr} | VWAP: {vwap_val}")
+        print(f"     PCR: {pcr_val} ({opt_chain.get('pcr_source','N/A')}) | Max Pain: {_mp} ({opt_chain.get('max_pain_source','N/A')})")
+        print(f"     Support: {_sr.get('support','N/A')} | Resistance: {_sr.get('resistance','N/A')} | Bias: {analysis_results.get('trend', {}).get('direction','N/A')}")
+        print(f"     Regime: {_reg.get('type','N/A')}/{_reg.get('classification','N/A')} | VIX: {rec.get('vix','N/A')}")
         print(f"     MTF: 5m {mtf.get('t5','N/A')} | 15m {mtf.get('t15','N/A')} | 1h {mtf.get('t1h','N/A')}")
-        print(f"     Fear & Greed: {ctx.get('fear_greed', 'NEUTRAL')}")
+        print(f"     Fear & Greed: {ctx.get('fear_greed', 'NEUTRAL')} | Chain: {opt_chain.get('source','N/A')} | Expiry: {opt_chain.get('expiry','N/A')}")
         
+        # --- SELECTED CONTRACT DETAIL (real chain fields only) ---
+        _cd = dict(opt_chain.get("pe_data" if _best_type == "PE" else "ce_data", {}).get(_best_strike, {}) or {})
+        # Derived fields live on the ranked candidate (spread_pct); keep the
+        # chain record as the source of raw values and backfill only what the
+        # chain itself does not carry.
+        for _k in ("spread_pct", "greeks", "greeks_source", "iv_source", "expiry"):
+            if _k not in _cd and _best.get(_k) is not None:
+                _cd[_k] = _best[_k]
+        def _nz(v, fmt="{:.2f}", zero_ok=False):
+            """Real value or an explicit 'Unavailable'. Never a silent 0.
+
+            `zero_ok` is for fields where a genuine 0 is meaningful data
+            (e.g. change-OI: "no OI build today" is a real observation, not
+            a missing value).
+            """
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                return "Unavailable"
+            if f == 0:
+                return "0" if zero_ok else "Unavailable"
+            return fmt.format(f)
+        _g = _cd.get("greeks") if isinstance(_cd.get("greeks"), dict) else {}
+        _intr = _nz(max(0.0, (float(spot) - float(_best_strike)) if _best_type == "CE"
+                         else (float(_best_strike) - float(spot))))
+        _tv = _nz(float(_cd.get("ltp", 0) or 0) - float(_intr)) if _intr != "Unavailable" else "Unavailable"
+        _dist = _nz(abs(float(_best_strike) - float(spot)), "{:.0f}", zero_ok=True)
+        print(f"  🔎 SELECTED CONTRACT — NIFTY {_best_strike} {_best_type}")
+        _spread = _cd.get("spread_pct")
+        if _spread is None:
+            try:
+                _b, _a, _l = float(_cd.get("bid", 0) or 0), float(_cd.get("ask", 0) or 0), float(_cd.get("ltp", 0) or 0)
+                if _b > 0 and _a > 0 and _l > 0:
+                    _spread = round((_a - _b) / _l * 100, 2)
+            except (TypeError, ValueError):
+                _spread = None
+        _sp = _nz(_spread, "{:.2f}")
+        _sp_disp = "Unavailable" if _sp == "Unavailable" else f"{_sp}%"
+        print(f"     LTP: {_nz(_cd.get('ltp'))} | Bid: {_nz(_cd.get('bid'))} | Ask: {_nz(_cd.get('ask'))} | Spread: {_sp_disp}")
+        _chg = _nz(_cd.get("change_oi"), "{:.0f}", zero_ok=True)
+        print(f"     OI: {_nz(_cd.get('oi'), '{:.0f}')} | Chg OI: {_chg} | Volume: {_nz(_cd.get('volume'), '{:.0f}')} | IV: {_nz(_cd.get('iv'))}%")
+        print(f"     Intrinsic: {_intr} | Time Value: {_tv} | Distance from ATM: {_dist} pts")
+        if _g:
+            print(f"     Delta: {_g.get('delta','—')} | Gamma: {_g.get('gamma','—')} | Theta: {_g.get('theta','—')} | Vega: {_g.get('vega','—')} [{_cd.get('greeks_source','DERIVED_BS')}]")
+        else:
+            print(f"     Delta/Gamma/Theta/Vega: Unavailable (no real IV for this contract)")
+        print(f"     Expiry: {_cd.get('expiry') or opt_chain.get('expiry','Unavailable')} | LTP source: {_cd.get('oi_source','n/a')}/IV source: {_cd.get('iv_source','UNKNOWN')}")
+        print(f"{'─'*70}")
         # --- TOP 3 STRIKES COMPARISON TABLE ---
         _ce_ranks = ranked_strikes.get("ce_rankings", [])[:3]
         _pe_ranks = ranked_strikes.get("pe_rankings", [])[:3]
         _strikes_to_show = _pe_ranks + _ce_ranks if direction == "BEARISH" else _ce_ranks + _pe_ranks
         
-        print(f"\n  🏆 TOP 3 STRIKES:")
-        print(f"  ┌─────────┬─────────┬────────┬──────┬───────┬───────┬─────────────────────┐")
-        print(f"  │ Strike  │  Final  │  Brain │Engine│ LTP   │ IV    │ Key Reason          │")
-        print(f"  ├─────────┼─────────┼────────┼──────┼───────┼───────┼─────────────────────┤")
+        # Columns are REAL fields with real producers. The previous
+        # "Brain"/"Engine" columns had no producer anywhere in v2 and always
+        # rendered N/A, while the header printed the ranking score under the
+        # same names — two different meanings for one label.
+        print(f"\n  🏆 TOP 3 STRIKES (real fields; '—' = unavailable):")
+        print(f"  ┌─────────┬──────┬────────┬────────┬────────┬────────┬─────────────────────┐")
+        print(f"  │ Strike  │ Type │  Score │  LTP   │Bid/Ask │ Delta  │ Key Reason          │")
+        print(f"  ├─────────┼──────┼────────┼────────┼────────┼────────┼─────────────────────┤")
         for s in _strikes_to_show[:3]:
             strike = s.get("strike", "N/A")
+            otype = s.get("option_type", "N/A")
             final = s.get("score", "N/A")
-            brain = s.get("brain_confidence", "N/A")
-            engine = s.get("engine_score", "N/A")
-            ltp_s = s.get("ltp", "N/A")
-            iv_s = s.get("iv", "N/A")
+            ltp_v = float(s.get("ltp", 0) or 0)
+            ltp_s = f"{ltp_v:.1f}" if ltp_v > 0 else "—"
+            bid_v = float(s.get("bid", 0) or 0)
+            ask_v = float(s.get("ask", 0) or 0)
+            ba = f"{bid_v:.1f}/{ask_v:.1f}" if bid_v > 0 and ask_v > 0 else "—"
+            gk = s.get("greeks")
+            dl = gk.get("delta") if isinstance(gk, dict) else None
+            delta_s = f"{dl:.3f}" if isinstance(dl, (int, float)) else "—"
             reasons = s.get("reasons", [])
             reason_short = reasons[0][:19] if reasons else "N/A"
-            print(f"  │ {str(strike):>7} │ {str(final):>7} │ {str(brain):>6} │{str(engine):>5} │ {str(ltp_s):>4} │ {str(iv_s):>3}% │ {reason_short:<19} │")
-        print(f"  └─────────┴─────────┴────────┴──────┴───────┴───────┴─────────────────────┘")
+            print(f"  │ {str(strike):>7} │ {str(otype):>4} │ {str(final):>6} │ {ltp_s:>6} │ {ba:>6} │ {delta_s:>6} │ {reason_short:<19} │")
+        print(f"  └─────────┴──────┴────────┴────────┴────────┴────────┴─────────────────────┘")
+        _gsrc = _best.get("greeks_source")
+        if _gsrc:
+            print(f"     Greeks source: {_gsrc} (Black-Scholes from real NSE IV; broker supplies none)")
         
         # --- INVALIDATION ---
         print(f"\n  ⚠️ INVALIDATION:")

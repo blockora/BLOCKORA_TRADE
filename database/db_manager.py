@@ -28,6 +28,46 @@ class DatabaseManager:
         self._create_tables()
         self._create_sub_tables()
         self._create_learning_tables()
+        self._migrate_analysis_columns()
+
+    # Columns added after v2.1. Additive only: existing rows keep working and
+    # an older database file is upgraded in place instead of needing a rebuild.
+    _ANALYSIS_COLUMNS = {
+        "spot": "REAL",
+        "expiry": "TEXT",
+        "regime": "TEXT",
+        "rsi": "REAL",
+        "adx": "REAL",
+        "atr": "REAL",
+        "vwap": "REAL",
+        "pcr": "REAL",
+        "max_pain": "REAL",
+        "final_score": "REAL",
+        "score_breakdown": "TEXT",
+        "chain_source": "TEXT",
+        "data_provenance": "TEXT",
+        "diagnostics": "TEXT",
+    }
+
+    def _migrate_analysis_columns(self):
+        """Add real-analysis columns to ai_decisions if they are missing.
+
+        Uses PRAGMA table_info rather than assuming a fresh database, so this is
+        a no-op on a current DB and a safe upgrade on a device that already has
+        an older ai_decisions table.
+        """
+        try:
+            cursor = self.connection.cursor()
+            existing = {r[1] for r in cursor.execute("PRAGMA table_info(ai_decisions)")}
+            if not existing:
+                return  # table not created (should not happen)
+            for col, ctype in self._ANALYSIS_COLUMNS.items():
+                if col not in existing:
+                    cursor.execute(f"ALTER TABLE ai_decisions ADD COLUMN {col} {ctype}")
+            self.connection.commit()
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"ai_decisions migration failed: {e}")
 
     def _create_tables(self):
         """Create all database tables"""
@@ -92,33 +132,59 @@ class DatabaseManager:
         self.connection.commit()
 
     def store_decision(self, recommendation):
-        """Store AI decision in database"""
+        """Store AI decision in database.
+
+        The extended analysis columns are written opportunistically: if a
+        database predates the migration the original insert is used, so an old
+        file never loses the decision row itself.
+        """
         try:
             cursor = self.connection.cursor()
-            cursor.execute("""
-                INSERT INTO ai_decisions
-                (timestamp, action, strike, option_type, confidence, grade,
-                 entry_price, stop_loss, target_1, target_2, target_3,
-                 risk_level, holding_time, reasons, market_bias, ai_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                recommendation.get("date", "") + " " + recommendation.get("time", ""),
-                recommendation.get("action", "NO_TRADE"),
-                recommendation.get("strike", 0),
-                recommendation.get("option_type", ""),
-                recommendation.get("confidence", 0),
-                recommendation.get("grade", ""),
-                recommendation.get("entry", 0),
-                recommendation.get("stop_loss", 0),
-                recommendation.get("target_1", 0),
-                recommendation.get("target_2", 0),
-                recommendation.get("target_3", 0),
-                recommendation.get("risk", ""),
-                recommendation.get("holding_time", ""),
-                json.dumps(recommendation.get("reasons", [])),
-                recommendation.get("bias", ""),
-                recommendation.get("ai_score", 0)
-            ))
+            base = {
+                "timestamp": recommendation.get("date", "") + " " + recommendation.get("time", ""),
+                "action": recommendation.get("action", "NO_TRADE"),
+                "strike": recommendation.get("strike", 0),
+                "option_type": recommendation.get("option_type", ""),
+                "confidence": recommendation.get("confidence", 0),
+                "grade": recommendation.get("grade", ""),
+                "entry_price": recommendation.get("entry", 0),
+                "stop_loss": recommendation.get("stop_loss", 0),
+                "target_1": recommendation.get("target_1", 0),
+                "target_2": recommendation.get("target_2", 0),
+                "target_3": recommendation.get("target_3", 0),
+                "risk_level": recommendation.get("risk", ""),
+                "holding_time": recommendation.get("holding_time", ""),
+                "reasons": json.dumps(recommendation.get("reasons", [])),
+                "market_bias": recommendation.get("bias", ""),
+                "ai_score": recommendation.get("ai_score", 0),
+                # --- real analysis context (migration-gated) ---
+                "spot": recommendation.get("spot"),
+                "expiry": recommendation.get("expiry", ""),
+                "regime": recommendation.get("regime", ""),
+                "rsi": recommendation.get("rsi"),
+                "adx": recommendation.get("adx"),
+                "atr": recommendation.get("atr"),
+                "vwap": recommendation.get("vwap"),
+                "pcr": recommendation.get("pcr"),
+                "max_pain": recommendation.get("max_pain"),
+                "final_score": recommendation.get("final_score"),
+                "score_breakdown": json.dumps(recommendation.get("score_breakdown", {})),
+                "chain_source": recommendation.get("chain_source", ""),
+                "data_provenance": json.dumps(recommendation.get("data_provenance", {})),
+                "diagnostics": json.dumps(recommendation.get("diagnostics", {})),
+            }
+            have = {r[1] for r in cursor.execute("PRAGMA table_info(ai_decisions)")}
+            if not have:
+                # Table missing/unreadable: this is a real write failure. Fall
+                # through to the exception handler so it is logged loudly,
+                # never dropped silently (the audit trail must not vanish).
+                raise sqlite3.OperationalError("ai_decisions table is missing")
+            cols = [c for c in base if c in have]
+            placeholders = ", ".join("?" for _ in cols)
+            cursor.execute(
+                f"INSERT INTO ai_decisions ({', '.join(cols)}) VALUES ({placeholders})",
+                tuple(base[c] for c in cols),
+            )
             self.connection.commit()
         except Exception as e:
             # Decision rows are the audit trail; a silent drop would corrupt

@@ -331,6 +331,11 @@ class StrikeRankingEngine:
             total -= 5
             reasons.append("Far OTM Theta Risk")
 
+        # Real premium fields first: spread_pct below is derived from them.
+        bid = float(my_data.get("bid", 0) or 0)
+        ask = float(my_data.get("ask", 0) or 0)
+        ltp = float(my_data.get("ltp", 0) or 0)
+
         candidate = {
             "strike": strike,
             "option_type": opt_type,
@@ -345,15 +350,23 @@ class StrikeRankingEngine:
             "iv": my_data.get("iv", 0),
             "bid": my_data.get("bid", 0),
             "ask": my_data.get("ask", 0),
+            # Provenance + derived greeks (only present when a REAL IV existed).
+            # Absent keys mean genuinely unavailable, never a default value.
+            "iv_source": my_data.get("iv_source", "UNKNOWN"),
+            "premium_source": my_data.get("premium_source", "REAL"),
+            "spread_pct": (round((ask - bid) / ltp * 100, 2)
+                           if ltp > 0 and bid > 0 and ask > 0 else None),
         }
+        if isinstance(my_data.get("greeks"), dict):
+            candidate["greeks"] = my_data["greeks"]
+            candidate["greeks_source"] = my_data.get("greeks_source", "DERIVED_BS")
+        if my_data.get("expiry"):
+            candidate["expiry"] = my_data["expiry"]
 
         # Trade levels from the chain record (real premium when bid/ask exist).
         # Entry/SL/targets use the application's documented scalp model
         # (data/strike_brain): entry=mid+25% slippage (or LTP), SL=entry-5,
         # T1/T2/T3=entry+7/10/14. Downstream validator/gates may override.
-        bid = float(my_data.get("bid", 0) or 0)
-        ask = float(my_data.get("ask", 0) or 0)
-        ltp = float(my_data.get("ltp", 0) or 0)
         try:
             expiry = my_data.get("expiry") or chain.get("expiry") or ""
         except Exception:
